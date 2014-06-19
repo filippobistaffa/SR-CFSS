@@ -242,6 +242,9 @@ void shuffle(void *array, size_t n, size_t size) {
 
 int main(int argc, char *argv[]) {
 
+	struct timeval t1, t2;
+	gettimeofday(&t1, NULL);
+
 	/*
 
 	register agent i;
@@ -329,7 +332,9 @@ int main(int argc, char *argv[]) {
 	}
 	*/
 
+	gettimeofday(&t2, NULL);
 	printf("Checksum = %u (size = %zu bytes)\n", crc32(sp, sizeof(dist) * 4 * N * N), sizeof(dist) * 4 * N * N);
+	printf("%f seconds\n", (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
 
 	free(stops);
 	free(adj);

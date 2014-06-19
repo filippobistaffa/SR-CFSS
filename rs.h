@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <sys/time.h>
 #include <immintrin.h>
 
 #define IDX "idx.dat"
@@ -16,7 +17,7 @@
 #define ROUTES 2520
 
 #define SEED 1236468
-#define N 100
+#define N 10
 
 #define DIST(dx, dy) (sqrt((dx) * (dx) + (dy) * (dy)))
 #define X(v, i) ((v)[2 * (i)])
