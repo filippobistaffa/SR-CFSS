@@ -1,6 +1,7 @@
 #define CAR 5
 #define M (CAR - 1)
 
+#include <omp.h>
 #include <math.h>
 #include <stdio.h>
 #include <float.h>
@@ -17,15 +18,40 @@
 #define ROUTES 2520
 
 #define SEED 1236468
-#define N 10
+#define N 1000
+#define K 2
+
+#define E (K * N - (K * (K + 1)) / 2)
+#define R (1 + (((E > N ? E : N) - 1) / 128))
 
 #define DIST(dx, dy) (sqrt((dx) * (dx) + (dy) * (dy)))
 #define X(v, i) ((v)[2 * (i)])
 #define Y(v, i) ((v)[2 * (i) + 1])
 
-typedef uint16_t point;
+#define OR(x, y) ({ register uint_fast8_t i; for (i = 0; i < R; i++) x[i] = _mm_or_si128(x[i], y[i]); })
+#define ANDNOT(x, y) ({ register uint_fast8_t i; for (i = 0; i < R; i++) x[i] = _mm_andnot_si128(y[i], x[i]); })
+#define ISSET(x, i) ((_mm_cvtsi128_si64(((i) >> 6) & 1 ? _mm_srli_si128(x[(i) >> 7], 8) : x[(i) >> 7]) >> ((i) & 63)) & 1)
+
+#define SET(x, i) ({ x[(i) >> 7] = _mm_or_si128(x[(i) >> 7], _mm_set_epi64x((((i) >> 6) & 1) ? 1ULL << ((i) & 63) : 0, \
+                     (((i) >> 6) & 1) ? 0 : 1ULL << ((i) & 63))); })
+
+#define CLEAR(x, i) ({ x[(i) >> 7] = _mm_andnot_si128(_mm_set_epi64x((((i) >> 6) & 1) ? 1ULL << ((i) & 63) : 0, \
+                       (((i) >> 6) & 1) ? 0 : 1ULL << ((i) & 63)), x[(i) >> 7]); })
+
+#define SHR1(x) ({ \
+        register __m128i t; register uint_fast8_t i; \
+        for (i = 0; i < R; i++) { \
+                t = _mm_set_epi64x(((i != R - 1) && (_mm_cvtsi128_si64(x[i + 1]) & 1)) ? 1ULL << 63 : 0, \
+                _mm_cvtsi128_si64(_mm_srli_si128(x[i], 8)) & 1 ? 1ULL << 63 : 0); \
+                x[i] = _mm_or_si128(t, _mm_srli_epi64(x[i], 1)); \
+        } \
+})
+
+typedef __m128i *contr;
 typedef uint32_t coord;
+typedef uint16_t point;
 typedef uint16_t agent;
+typedef uint16_t edge;
 typedef uint32_t id;
 typedef float dist;
 
@@ -35,3 +61,4 @@ typedef struct{
 } item;
 
 #include "crc32.h"
+#include "random.h"

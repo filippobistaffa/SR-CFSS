@@ -89,6 +89,73 @@ __attribute__((always_inline)) inline dist minsse(dist *buf) {
 	return _mm_extract_ps(tmp, 0);
 }
 
+__attribute__((always_inline))
+inline void contract(edge *g, agent *a, agent v1, agent v2, contr n, contr h, agent *s) {
+
+	register uint_fast64_t i, e, f = 0;
+	__m128i nt[R];
+	memcpy(nt, n, sizeof(__m128i) * R);
+
+	for (i = 0; i < N; i++) {
+
+		if (_mm_cvtsi128_si64(nt[0]) & 1) {
+                        SHR1(nt);
+                        continue;
+                }
+
+		SHR1(nt);
+                if (i == v1 || i == v2) continue;
+                //ds[v1 * N + i] = (ds[i * N + v1] += ds[v2 * N + i]);
+
+		if ((e = g[i * N + v2])) {
+
+			register uint_fast64_t t;
+
+			if ((t = g[i * N + v1])) {
+
+				if (t < e) {
+					f = e;
+					e = t;
+				}
+				else f = t;
+
+				SET(h, f);
+			}
+
+			g[i * N + v1] = g[v1 * N + i] = e;
+			a[e * 2] = v1;
+			a[e * 2 + 1] = i;
+		}
+	}
+
+	//ds[v1 * N + v1] += ds[v2 * N + v2] + ds[v1 * N + v2];
+	s[v1] += s[v2];
+}
+
+void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent *s) {
+
+	__m128i h[R];
+	register edge f, j;
+	register agent v1, v2;
+	count++;
+
+	for (f = e + 1; f < E + 1; f++)
+		if (!ISSET(d, f) && s[v1 = a[f * 2]] + s[v2 = a[f * 2 + 1]] <= CAR) {
+			memcpy(g + N * N, g, sizeof(edge) * N * N);
+			memcpy(a + 2 * (E + 1), a, sizeof(agent) * 2 * (E + 1));
+			memcpy(s + N, s, sizeof(agent) * N);
+			for (j = 0; j < R; j++) h[j] = _mm_setzero_si128();
+			contract(g + N * N, a + 2 * (E + 1), v1, v2, n, h, s + N);
+			SET(n, v2);
+			SET(c, f);
+			OR(d, h);
+			edgecontraction(g + N * N, a + 2 * (E + 1), f, n, c, d, s + N);
+			CLEAR(n, v2);
+			CLEAR(c, f);
+			ANDNOT(d, h);
+		}
+}
+
 __attribute__((always_inline)) inline
 void reheapdown(item *q, point root, point bottom) {
 
@@ -240,6 +307,50 @@ void shuffle(void *array, size_t n, size_t size) {
 	}
 }
 
+inline void createedge(edge *g, agent *a, agent v1, agent v2, edge e) {
+
+	g[v1 * N + v2] = g[v2 * N + v1] = e;
+	a[e * 2] = v1;
+	a[e * 2 + 1] = v2;
+}
+
+void createScaleFree(edge *g, agent *a) {
+
+	uint_fast8_t deg[N] = {0};
+	register uint_fast64_t d, i, j, h, k = 1, q, t = 0;
+	register int p;
+
+	for (i = 1; i <= K; i++) {
+		for (j = 0; j < i; j++) {
+			createedge(g, a, i, j, k++);
+			deg[i]++;
+			deg[j]++;
+		}
+	}
+
+	for (i = K + 1; i < N; i++) {
+		t &= ~((1UL << i) - 1);
+		for (j = 0; j < K; j++) {
+			d = 0;
+			for (h = 0; h < i; h++)
+				if (!((t >> h) & 1)) d += deg[h];
+			if (d > 0) {
+				p = nextInt(d);
+				q = 0;
+				while (p >= 0) {
+					if (!((t >> q) & 1)) p = p - deg[q];
+					q++;
+				}
+				q--;
+				t |= 1UL << q;
+				createedge(g, a, i, q, k++);
+				deg[i]++;
+				deg[q]++;
+			}
+		}
+	}
+}
+
 int main(int argc, char *argv[]) {
 
 	struct timeval t1, t2;
@@ -304,8 +415,7 @@ int main(int argc, char *argv[]) {
 	srand(SEED);
 	shuffle(stops, pool, sizeof(point) * 2);
 	stops = realloc(stops, sizeof(point) * 2 * N);
-
-	dist *d = calloc(nodes * nodes, sizeof(dist));
+	dist *ds = calloc(nodes * nodes, sizeof(dist));
 
 	register point i, j;
 	register dist dx, dy;
@@ -314,15 +424,17 @@ int main(int argc, char *argv[]) {
 		for (j = i + 1; j < nodes; j++) {
 			dx = (dist)X(xy, i) - X(xy, j);
 			dy = (dist)Y(xy, i) - Y(xy, j);
-			d[i * nodes + j] = d[j * nodes + i] = DIST(dx, dy);
+			ds[i * nodes + j] = ds[j * nodes + i] = DIST(dx, dy);
 		}
 
+	omp_set_num_threads(2);
 	dist *sp = calloc(4 * N * N, sizeof(dist));
+	printf("Using %u threads\n", omp_get_max_threads());
 
-	//#pragma omp parallel for schedule(dynamic) private(i)
+	#pragma omp parallel for schedule(dynamic) private(i)
 	for (i = 0; i < 2 * N; i++)
 		for (j = i + 1; j < 2 * N; j++)
-			sp[i * 2 * N + j] = sp[j * 2 * N + i] = astar(stops[i], stops[j], nodes, idx, adj, d);
+			sp[i * 2 * N + j] = sp[j * 2 * N + i] = astar(stops[i], stops[j], nodes, idx, adj, ds);
 
 	/*
 	for (i = 0; i < 2 * N; i++) {
@@ -332,7 +444,23 @@ int main(int argc, char *argv[]) {
 	}
 	*/
 
+	edge *g = malloc(sizeof(edge) * N * N * N);
+	memset(g, 0, sizeof(edge) * N * N);
+	agent *a = malloc(sizeof(agent) * N * 2 * (E + 1));
+	agent *s = malloc(sizeof(agent) * N * N);
+	for (i = 0; i < N; i++) s[i] = 1;
+
+	init(SEED);
+	createScaleFree(g, a);
+
+	__m128i n[R], c[R], d[R];
+	for (i = 0; i < R; i++)
+		n[i] = c[i] = d[i] = _mm_setzero_si128();
+
+	edgecontraction(g, a, 0, n, c, d, s);
 	gettimeofday(&t2, NULL);
+	printf("%zu CSs\n", count);
+
 	printf("Checksum = %u (size = %zu bytes)\n", crc32(sp, sizeof(dist) * 4 * N * N), sizeof(dist) * 4 * N * N);
 	printf("%f seconds\n", (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
 
@@ -341,6 +469,9 @@ int main(int argc, char *argv[]) {
 	free(idx);
 	free(xy);
 	free(sp);
-	free(d);
+	free(ds);
+	free(g);
+	free(a);
+	free(s);
 	return 0;
 }
