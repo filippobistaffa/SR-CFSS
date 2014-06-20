@@ -427,7 +427,6 @@ int main(int argc, char *argv[]) {
 			ds[i * nodes + j] = ds[j * nodes + i] = DIST(dx, dy);
 		}
 
-	omp_set_num_threads(2);
 	dist *sp = calloc(4 * N * N, sizeof(dist));
 	printf("Using %u threads\n", omp_get_max_threads());
 
