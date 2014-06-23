@@ -15,10 +15,13 @@
 #define ADJ "adj.dat"
 #define XY "xy.dat"
 #define SS "ss.dat"
-#define ROUTES 2520
+
+#define R5 2520
+#define R4 90
+#define R3 6
 
 #define SEED 1236468
-#define N 1000
+#define N 20
 #define K 2
 
 #define E (K * N - (K * (K + 1)) / 2)
