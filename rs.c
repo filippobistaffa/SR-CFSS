@@ -28,9 +28,8 @@ void printpath(agent *q, agent *s, agent *p) {
 	}
 }
 
-__attribute__((always_inline)) inline dist minsse(dist *buf) {
+__attribute__((always_inline)) inline dist minsse(dist *buf, agent n) {
 
-	register uint16_t n = ROUTES;
 	register __m128 tmp, min = _mm_set1_ps(FLT_MAX);
 
 	// tmp input until "buf" reaches 16 byte alignment
@@ -90,11 +89,27 @@ __attribute__((always_inline)) inline dist minsse(dist *buf) {
 }
 
 __attribute__((always_inline))
-inline void contract(edge *g, agent *a, agent v1, agent v2, contr n, contr h, agent *s) {
+inline void contract(edge *g, agent *a, agent v1, agent v2, contr n, contr h, agent *s, agent *cs) {
 
-	register uint_fast64_t i, e, f = 0;
+	register uint_fast64_t i, e, k, min = v1, max = v2;
 	__m128i nt[R];
 	memcpy(nt, n, sizeof(__m128i) * R);
+
+	if (Y(s, max) < Y(s, min)) {
+		k = max;
+		max = min;
+		min = k;
+	}
+
+	e = X(s, min);
+	k = X(s, max);
+	max = Y(s, max);
+	Y(s, v1) = min = Y(s, min);
+	agent c[k];
+	X(s, v1) = e + k;
+	memcpy(c, cs + max, sizeof(agent) * k);
+	memmove(cs + min + e + k, cs + min + e, sizeof(agent) * (max - min - e));
+	memcpy(cs + min + e, c, sizeof(agent) * k);
 
 	for (i = 0; i < N; i++) {
 
@@ -105,11 +120,12 @@ inline void contract(edge *g, agent *a, agent v1, agent v2, contr n, contr h, ag
 
 		SHR1(nt);
                 if (i == v1 || i == v2) continue;
-                //ds[v1 * N + i] = (ds[i * N + v1] += ds[v2 * N + i]);
+		e = Y(s, i);
+                if (e > min && e < max) Y(s, i) = e + k;
 
 		if ((e = g[i * N + v2])) {
 
-			register uint_fast64_t t;
+			register uint_fast64_t t, f;
 
 			if ((t = g[i * N + v1])) {
 
@@ -127,34 +143,68 @@ inline void contract(edge *g, agent *a, agent v1, agent v2, contr n, contr h, ag
 			a[e * 2 + 1] = i;
 		}
 	}
-
-	//ds[v1 * N + v1] += ds[v2 * N + v2] + ds[v1 * N + v2];
-	s[v1] += s[v2];
 }
 
-void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent *s) {
+void printcs(agent *s, agent *cs, contr n) {
+
+	register agent i, j;
+
+	for (i = 0; i < N; i++) if (!ISSET(n, i)) {
+		printf("{ ");
+		for (j = 0; j < X(s, i); j++) printf("%u ", cs[Y(s, i) + j]);
+		printf("}\n");
+	}
+	printf("\n");
+}
+
+dist value(agent *s, agent *cs, contr n, dist *sp, dist *v) {
+
+	dist r[ROUTES];
+	__m128i nt[R];
+	memcpy(nt, n, sizeof(__m128i) * R);
+	register agent i, *c;
+
+	for (i = 0; i < N; i++) {
+
+		if (_mm_cvtsi128_si64(nt[0]) & 1) {
+                        SHR1(nt);
+                        continue;
+                }
+
+		SHR1(nt);
+		c = cs + Y(s, i);
+	}
+
+	return 0;
+}
+
+void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent *s, agent *cs) {
 
 	__m128i h[R];
 	register edge f, j;
 	register agent v1, v2;
 	count++;
 
+	//printcs(s, cs, n);
+
 	for (f = e + 1; f < E + 1; f++)
-		if (!ISSET(d, f) && s[v1 = a[f * 2]] + s[v2 = a[f * 2 + 1]] <= CAR) {
+		if (!ISSET(d, f) && X(s, v1 = a[f * 2]) + X(s, v2 = a[f * 2 + 1]) <= CAR) {
 			memcpy(g + N * N, g, sizeof(edge) * N * N);
 			memcpy(a + 2 * (E + 1), a, sizeof(agent) * 2 * (E + 1));
-			memcpy(s + N, s, sizeof(agent) * N);
+			memcpy(s + 2 * N, s, sizeof(agent) * 2 * N);
+			memcpy(cs +  N, cs, sizeof(agent) * N);
 			for (j = 0; j < R; j++) h[j] = _mm_setzero_si128();
-			contract(g + N * N, a + 2 * (E + 1), v1, v2, n, h, s + N);
+			contract(g + N * N, a + 2 * (E + 1), v1, v2, n, h, s + 2 * N, cs + N);
 			SET(n, v2);
 			SET(c, f);
 			OR(d, h);
-			edgecontraction(g + N * N, a + 2 * (E + 1), f, n, c, d, s + N);
+			edgecontraction(g + N * N, a + 2 * (E + 1), f, n, c, d, s + 2 * N, cs + N);
 			CLEAR(n, v2);
 			CLEAR(c, f);
 			ANDNOT(d, h);
 		}
 }
+
 
 __attribute__((always_inline)) inline
 void reheapdown(item *q, point root, point bottom) {
@@ -446,8 +496,13 @@ int main(int argc, char *argv[]) {
 	edge *g = malloc(sizeof(edge) * N * N * N);
 	memset(g, 0, sizeof(edge) * N * N);
 	agent *a = malloc(sizeof(agent) * N * 2 * (E + 1));
-	agent *s = malloc(sizeof(agent) * N * N);
-	for (i = 0; i < N; i++) s[i] = 1;
+	agent *s = malloc(sizeof(agent) * 2 * N * N);
+	agent *cs = malloc(sizeof(agent) * N * N);
+
+	for (i = 0; i < N; i++) {
+		X(s, i) = 1;
+		Y(s, i) = cs[i] = i;
+	}
 
 	init(SEED);
 	createScaleFree(g, a);
@@ -456,7 +511,7 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < R; i++)
 		n[i] = c[i] = d[i] = _mm_setzero_si128();
 
-	edgecontraction(g, a, 0, n, c, d, s);
+	edgecontraction(g, a, 0, n, c, d, s, cs);
 	gettimeofday(&t2, NULL);
 	printf("%zu CSs\n", count);
 
@@ -466,6 +521,7 @@ int main(int argc, char *argv[]) {
 	free(stops);
 	free(adj);
 	free(idx);
+	free(cs);
 	free(xy);
 	free(sp);
 	free(ds);
