@@ -1,1 +1,1 @@
-r[0]=sp[X(stops,c[0])*N+X(stops,c[1])]+sp[X(stops,c[1])*N+Y(stops,c[1])]+sp[Y(stops,c[1])*N+Y(stops,c[0])];
+r[0]=sp[(2*c[0])*2*N+(2*c[1])]+sp[(2*c[1])*2*N+(2*c[1]+1)]+sp[(2*c[1]+1)*2*N+(2*c[0]+1)];
