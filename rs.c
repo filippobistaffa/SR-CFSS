@@ -1,6 +1,7 @@
 #include "rs.h"
 
 uint64_t count;
+dist opt;
 
 void printpath(agent *q, agent *s, agent *p) {
 
@@ -79,7 +80,7 @@ dist minsse(const dist *buf, agent n) {
 		n--;
 	}
 
-	// Find min & max value in current_max through shuffle tricks
+	// Find min value through shuffle tricks
 
 	tmp = min;
 	tmp = _mm_shuffle_ps(tmp, tmp, _MM_SHUFFLE(2, 3, 0, 1));
@@ -87,8 +88,7 @@ dist minsse(const dist *buf, agent n) {
 	min = tmp;
 	tmp = _mm_shuffle_ps(tmp, tmp, _MM_SHUFFLE(1, 0, 3, 2));
 	tmp = _mm_min_ps(tmp, min);
-
-	return _mm_extract_ps(tmp, 0);
+	return tmp[0];
 }
 
 __attribute__((always_inline)) inline
@@ -105,53 +105,44 @@ dist minpar(const dist *buf, agent n) {
 }
 
 __attribute__((always_inline)) inline
-dist value(const agent *s, const agent *cs, const contr n, const dist *sp, dist *v) {
+dist arraysum(const dist *buf, agent n) {
+
+	register agent i;
+	register dist sum = 0;
+	for (i = 0; i < n; i++) sum += buf[i];
+	return sum;
+}
+
+__attribute__((always_inline)) inline
+dist minpath(const agent *c, agent n, const dist *sp) {
 
 	dist r[R5];
-	__m128i nt[R];
-	memcpy(nt, n, sizeof(__m128i) * R);
-	register const agent *c;
-	register dist tot = 0;
-	register agent i;
 
-	for (i = 0; i < N; i++) {
-
-		if (_mm_cvtsi128_si64(nt[0]) & 1) {
-                        SHR1(nt);
-                        continue;
-                }
-
-		SHR1(nt);
-		c = cs + Y(s, i);
-
-		switch (X(s, i)) {
-			case 5:
-				#include "paths5.h"
-				//r[0] = minsse(r, R5);
-				r[0] = minpar(r, R5);
-				break;
-			case 4:
-				#include "paths4.h"
-				r[0] = minsse(r, R4);
-				//r[0] = minpar(r, R4);
-				break;
-			case 3:
-				#include "paths3.h"
-				r[0] = minsse(r, R3);
-				//r[0] = minpar(r, R3);
-				break;
-			case 2:
-				#include "paths2.h"
-				break;
-			default:
-				#include "paths1.h"
-				break;
-		}
-
-		tot += (v[i] = r[0]);
+	switch (n) {
+		case 5:
+			#include "paths5.h"
+			//r[0] = minsse(r, R5);
+			r[0] = minpar(r, R5);
+			break;
+		case 4:
+			#include "paths4.h"
+			r[0] = minsse(r, R4);
+			//r[0] = minpar(r, R4);
+			break;
+		case 3:
+			#include "paths3.h"
+			r[0] = minsse(r, R3);
+			//r[0] = minpar(r, R3);
+			break;
+		case 2:
+			#include "paths2.h"
+			break;
+		default:
+			#include "paths1.h"
+			break;
 	}
 
-	return tot;
+	return r[0];
 }
 
 __attribute__((always_inline)) inline
@@ -211,41 +202,46 @@ void contract(edge *g, agent *a, agent v1, agent v2, contr n, contr h, agent *s,
 	}
 }
 
-void printcs(agent *s, agent *cs, contr n) {
+void printcs(agent *s, agent *cs, contr n, dist *v) {
 
-	register agent i, j;
+        register agent i, j;
 
-	for (i = 0; i < N; i++) if (!ISSET(n, i)) {
-		printf("{ ");
-		for (j = 0; j < X(s, i); j++) printf("%u ", cs[Y(s, i) + j]);
-		printf("}\n");
-	}
-	printf("\n");
+        for (i = 0; i < N; i++) if (!ISSET(n, i)) {
+                printf("{ ");
+                for (j = 0; j < X(s, i); j++) printf("%u ", cs[Y(s, i) + j]);
+                printf("} = %f\n", v[i]);
+        }
 }
 
-void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent *s, agent *cs, const dist *sp) {
+void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent *s, agent *cs, dist *v, const dist *sp) {
 
-	dist v[N];
+	count++;
 	__m128i h[R];
 	register edge f, j;
 	register agent v1, v2;
-	count++;
+	register dist val = arraysum(v, N);
 
-	//printcs(s, cs, n);
-	value(s, cs, n, sp, v);
+	if (val < opt) {
+		printcs(s, cs, n, v);
+		printf("new minimum %f\n", val);
+		opt = val;
+	}
 
 	for (f = e + 1; f < E + 1; f++)
 		if (!ISSET(d, f) && X(s, v1 = a[f * 2]) + X(s, v2 = a[f * 2 + 1]) <= CAR) {
 			memcpy(g + N * N, g, sizeof(edge) * N * N);
 			memcpy(a + 2 * (E + 1), a, sizeof(agent) * 2 * (E + 1));
 			memcpy(s + 2 * N, s, sizeof(agent) * 2 * N);
-			memcpy(cs +  N, cs, sizeof(agent) * N);
+			memcpy(cs + N, cs, sizeof(agent) * N);
+			memcpy(v + N, v, sizeof(dist) * N);
 			for (j = 0; j < R; j++) h[j] = _mm_setzero_si128();
 			contract(g + N * N, a + 2 * (E + 1), v1, v2, n, h, s + 2 * N, cs + N);
+			v[N + v1] = minpath(cs + N + Y(s + 2 * N, v1), X(s + 2 * N, v1), sp);
+			v[N + v2] = 0;
 			SET(n, v2);
 			SET(c, f);
 			OR(d, h);
-			edgecontraction(g + N * N, a + 2 * (E + 1), f, n, c, d, s + 2 * N, cs + N, sp);
+			edgecontraction(g + N * N, a + 2 * (E + 1), f, n, c, d, s + 2 * N, cs + N, v + N, sp);
 			CLEAR(n, v2);
 			CLEAR(c, f);
 			ANDNOT(d, h);
@@ -525,7 +521,7 @@ int main(int argc, char *argv[]) {
 	dist *sp = calloc(4 * N * N, sizeof(dist));
 	printf("Using %u threads\n", omp_get_max_threads());
 
-	#pragma omp parallel for schedule(dynamic) private(i)
+	#pragma omp parallel for schedule(dynamic) private(i, j)
 	for (i = 0; i < 2 * N; i++)
 		for (j = i + 1; j < 2 * N; j++)
 			sp[i * 2 * N + j] = sp[j * 2 * N + i] = astar(stops[i], stops[j], nodes, idx, adj, ds);
@@ -541,10 +537,12 @@ int main(int argc, char *argv[]) {
 	agent *a = malloc(sizeof(agent) * N * 2 * (E + 1));
 	agent *s = malloc(sizeof(agent) * 2 * N * N);
 	agent *cs = malloc(sizeof(agent) * N * N);
+	dist *v = malloc(sizeof(dist) * N * N);
 
 	for (i = 0; i < N; i++) {
 		X(s, i) = 1;
 		Y(s, i) = cs[i] = i;
+		opt += (v[i] = sp[4 * i * N + 2 * i + 1]);
 	}
 
 	init(SEED);
@@ -554,7 +552,7 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < R; i++)
 		n[i] = c[i] = d[i] = _mm_setzero_si128();
 
-	edgecontraction(g, a, 0, n, c, d, s, cs, sp);
+	edgecontraction(g, a, 0, n, c, d, s, cs, v, sp);
 	gettimeofday(&t2, NULL);
 	printf("%zu CSs\n", count);
 
@@ -568,6 +566,7 @@ int main(int argc, char *argv[]) {
 	free(xy);
 	free(sp);
 	free(ds);
+	free(v);
 	free(g);
 	free(a);
 	free(s);
