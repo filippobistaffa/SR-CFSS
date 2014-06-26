@@ -31,6 +31,7 @@
 #define X(v, i) ((v)[2 * (i)])
 #define Y(v, i) ((v)[2 * (i) + 1])
 
+#define LASTBIT(x) (_mm_cvtsi128_si64((x)[0]) & 1)
 #define OR(x, y) ({ register uint_fast8_t i; for (i = 0; i < R; i++) x[i] = _mm_or_si128(x[i], y[i]); })
 #define ANDNOT(x, y) ({ register uint_fast8_t i; for (i = 0; i < R; i++) x[i] = _mm_andnot_si128(y[i], x[i]); })
 #define ISSET(x, i) ((_mm_cvtsi128_si64(((i) >> 6) & 1 ? _mm_srli_si128(x[(i) >> 7], 8) : x[(i) >> 7]) >> ((i) & 63)) & 1)
