@@ -32,9 +32,10 @@ void printpath(agent *q, agent *s, agent *p) {
 }
 
 __attribute__((always_inline)) inline
-dist minsse(const dist *buf, agent n) {
+void minsse(dist *b, agent n) {
 
 	register __m128 tmp, min = _mm_set1_ps(FLT_MAX);
+	register dist *buf = b;
 
 	// tmp input until "buf" reaches 16 byte alignment
 	while (((unsigned long)buf) % 16 != 0 && n > 0) {
@@ -88,20 +89,7 @@ dist minsse(const dist *buf, agent n) {
 	min = tmp;
 	tmp = _mm_shuffle_ps(tmp, tmp, _MM_SHUFFLE(1, 0, 3, 2));
 	tmp = _mm_min_ps(tmp, min);
-	return tmp[0];
-}
-
-__attribute__((always_inline)) inline
-dist minpar(const dist *buf, agent n) {
-
-	register dist minval = FLT_MAX;
-	register agent i;
-
-	#pragma omp parallel for private(i) reduction(min : minval)
-	for (i = 0; i < n; i++)
-		if (buf[i] < minval) minval = buf[i];
-
-	return minval;
+	_mm_store_ss(b, tmp);
 }
 
 __attribute__((always_inline)) inline
@@ -121,18 +109,15 @@ dist minpath(const agent *c, agent n, const dist *sp) {
 	switch (n) {
 		case 5:
 			#include "paths5.h"
-			//r[0] = minsse(r, R5);
-			r[0] = minpar(r, R5);
+			minsse(r, R5);
 			break;
 		case 4:
 			#include "paths4.h"
-			r[0] = minsse(r, R4);
-			//r[0] = minpar(r, R4);
+			minsse(r, R4);
 			break;
 		case 3:
 			#include "paths3.h"
-			r[0] = minsse(r, R3);
-			//r[0] = minpar(r, R3);
+			minsse(r, R3);
 			break;
 		case 2:
 			#include "paths2.h"
@@ -202,29 +187,29 @@ void contract(edge *g, agent *a, agent v1, agent v2, contr n, contr h, agent *s,
 	}
 }
 
-void printcs(agent *s, agent *cs, contr n, dist *v) {
+void printcs(agent *s, agent *cs, contr n) {
 
         register agent i, j;
 
         for (i = 0; i < N; i++) if (!ISSET(n, i)) {
                 printf("{ ");
                 for (j = 0; j < X(s, i); j++) printf("%u ", cs[Y(s, i) + j]);
-                printf("} = %f\n", v[i]);
+                printf("}\n");
         }
 }
 
-void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent *s, agent *cs, dist *v, const dist *sp) {
+void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent *s, agent *cs, dist *vc, dist vcs, const dist *sp) {
 
 	count++;
 	__m128i h[R];
 	register edge f, j;
 	register agent v1, v2;
-	register dist val = arraysum(v, N);
+	register dist nv;
 
-	if (val < opt) {
-		printcs(s, cs, n, v);
-		printf("new minimum %f\n", val);
-		opt = val;
+	if (vcs < opt) {
+		printcs(s, cs, n);
+                printf("new minimum %f\n", vcs);
+		opt = vcs;
 	}
 
 	for (f = e + 1; f < E + 1; f++)
@@ -233,15 +218,14 @@ void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent
 			memcpy(a + 2 * (E + 1), a, sizeof(agent) * 2 * (E + 1));
 			memcpy(s + 2 * N, s, sizeof(agent) * 2 * N);
 			memcpy(cs + N, cs, sizeof(agent) * N);
-			memcpy(v + N, v, sizeof(dist) * N);
+			memcpy(vc + N, vc, sizeof(dist) * N);
 			for (j = 0; j < R; j++) h[j] = _mm_setzero_si128();
 			contract(g + N * N, a + 2 * (E + 1), v1, v2, n, h, s + 2 * N, cs + N);
-			v[N + v1] = minpath(cs + N + Y(s + 2 * N, v1), X(s + 2 * N, v1), sp);
-			v[N + v2] = 0;
+			nv = vc[N + v1] = minpath(cs + N + Y(s + 2 * N, v1), X(s + 2 * N, v1), sp);
 			SET(n, v2);
 			SET(c, f);
 			OR(d, h);
-			edgecontraction(g + N * N, a + 2 * (E + 1), f, n, c, d, s + 2 * N, cs + N, v + N, sp);
+			edgecontraction(g + N * N, a + 2 * (E + 1), f, n, c, d, s + 2 * N, cs + N, vc + N, vcs + nv - vc[v1] - vc[v2], sp);
 			CLEAR(n, v2);
 			CLEAR(c, f);
 			ANDNOT(d, h);
@@ -255,7 +239,7 @@ void reheapdown(item *q, point root, point bottom) {
 	register item temp;
 
 	while (left <= bottom) {
-		right = root * 2 + 2; // Get index of root's right child
+		right = root * 2 + 2;
 		if (left == bottom) min = left;
 		else min = q[left].f >= q[right].f ? right : left;
 		if (q[root].f > q[min].f) {
@@ -348,7 +332,6 @@ dist astar(point start, point dest, point nodes, const id *idx, const point *adj
 			free(g);
 			return g[cur];
 		}
-		//printf("current = %u %f\n", cur, g[cur]);
 		inoset[cur] = 0;
 		q--;
 		cset[cur] = 1;
@@ -364,10 +347,6 @@ dist astar(point start, point dest, point nodes, const id *idx, const point *adj
 						enqueue(oset, q, i);
 						inoset[nbr] = 1;
 						q++;
-						//int j;
-						//puts("queue");
-						//for (j = 0; j < q; j++) printf("%u %f\n", oset[j].p, oset[j].f);
-						//puts("endqueue");
 					}
 				}
 			}
@@ -537,12 +516,12 @@ int main(int argc, char *argv[]) {
 	agent *a = malloc(sizeof(agent) * N * 2 * (E + 1));
 	agent *s = malloc(sizeof(agent) * 2 * N * N);
 	agent *cs = malloc(sizeof(agent) * N * N);
-	dist *v = malloc(sizeof(dist) * N * N);
+	dist *vc = malloc(sizeof(dist) * N * N);
 
 	for (i = 0; i < N; i++) {
 		X(s, i) = 1;
 		Y(s, i) = cs[i] = i;
-		opt += (v[i] = sp[4 * i * N + 2 * i + 1]);
+		opt += (vc[i] = sp[4 * i * N + 2 * i + 1]);
 	}
 
 	init(SEED);
@@ -552,7 +531,7 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < R; i++)
 		n[i] = c[i] = d[i] = _mm_setzero_si128();
 
-	edgecontraction(g, a, 0, n, c, d, s, cs, v, sp);
+	edgecontraction(g, a, 0, n, c, d, s, cs, vc, opt, sp);
 	gettimeofday(&t2, NULL);
 	printf("%zu CSs\n", count);
 
@@ -566,7 +545,7 @@ int main(int argc, char *argv[]) {
 	free(xy);
 	free(sp);
 	free(ds);
-	free(v);
+	free(vc);
 	free(g);
 	free(a);
 	free(s);
