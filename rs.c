@@ -155,7 +155,7 @@ void contract(edge *g, agent *a, agent v1, agent v2, contr n, contr h, agent *s,
 
 	for (i = 0; i < N; i++) {
 
-		if (_mm_cvtsi128_si64(nt[0]) & 1) {
+		if (LASTBIT(nt)) {
                         SHR1(nt);
                         continue;
                 }
@@ -202,15 +202,32 @@ void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent
 
 	count++;
 	__m128i h[R];
-	register edge f, j;
-	register agent v1, v2;
 	register dist nv;
+	register edge f, j;
+	register agent v1 = 0, v2;
+	typedef struct { agent x; agent y; } agentxy;
 
 	if (vcs < opt) {
 		printcs(s, cs, n);
                 printf("new minimum %f\n", vcs);
 		opt = vcs;
 	}
+
+	agentxy oc[N];
+	__m128i nt[R];
+	memcpy(nt, n, sizeof(__m128i) * R);
+
+	for (f = 0; f < N; f++) {
+		if (!LASTBIT(nt)) {
+			oc[v1].x = X(s, f);
+			oc[v1++].y = f;
+		}
+		SHR1(nt);
+	}
+
+	#include "iqsort.h"
+	#define gt(a, b) ((*a).x > (*b).x)
+	QSORT(agentxy, oc, v1, gt);
 
 	for (f = e + 1; f < E + 1; f++)
 		if (!ISSET(d, f) && X(s, v1 = a[f * 2]) + X(s, v2 = a[f * 2 + 1]) <= CAR) {
@@ -511,6 +528,8 @@ int main(int argc, char *argv[]) {
 	//	puts("");
 	//}
 
+	free(ds);
+	free(adj);
 	edge *g = malloc(sizeof(edge) * N * N * N);
 	memset(g, 0, sizeof(edge) * N * N);
 	agent *a = malloc(sizeof(agent) * N * 2 * (E + 1));
@@ -539,12 +558,10 @@ int main(int argc, char *argv[]) {
 	printf("%f seconds\n", (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
 
 	free(stops);
-	free(adj);
 	free(idx);
 	free(cs);
 	free(xy);
 	free(sp);
-	free(ds);
 	free(vc);
 	free(g);
 	free(a);
