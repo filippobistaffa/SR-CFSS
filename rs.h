@@ -59,10 +59,9 @@ typedef uint16_t edge;
 typedef uint32_t id;
 typedef float dist;
 
-typedef struct{
-    point p;
-    dist f;
-} item;
+typedef struct { point p; dist f; } item;
+typedef struct { agent x; agent y; } agentxy;
 
 #include "crc32.h"
 #include "random.h"
+#include "iqsort.h"

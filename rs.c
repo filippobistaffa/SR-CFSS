@@ -1,7 +1,9 @@
 #include "rs.h"
 
-uint64_t count;
 dist opt;
+uint64_t count;
+static agent csg[N];
+static agent sg[2 * N];
 
 void printpath(agent *q, agent *s, agent *p) {
 
@@ -131,103 +133,223 @@ dist minpath(const agent *c, agent n, const dist *sp) {
 }
 
 __attribute__((always_inline)) inline
-void contract(edge *g, agent *a, agent v1, agent v2, contr n, contr h, agent *s, agent *cs) {
+void merge(agent v1, agent v2, contr n, agent *s, agent *cs) {
 
-	register uint_fast64_t i, e, k, min = v1, max = v2;
-	__m128i nt[R];
-	memcpy(nt, n, sizeof(__m128i) * R);
+	register agent a, b, i, min = v1, max = v2;
 
 	if (Y(s, max) < Y(s, min)) {
-		k = max;
+		b = max;
 		max = min;
-		min = k;
+		min = b;
 	}
 
-	e = X(s, min);
-	k = X(s, max);
+	a = X(s, min);
+	b = X(s, max);
 	max = Y(s, max);
 	Y(s, v1) = min = Y(s, min);
-	agent c[k];
-	X(s, v1) = e + k;
-	memcpy(c, cs + max, sizeof(agent) * k);
-	memmove(cs + min + e + k, cs + min + e, sizeof(agent) * (max - min - e));
-	memcpy(cs + min + e, c, sizeof(agent) * k);
+	agent c[b];
+	X(s, v1) = a + b;
+	memcpy(c, cs + max, sizeof(agent) * b);
+	memmove(cs + min + a + b, cs + min + a, sizeof(agent) * (max - min - a));
+	memcpy(cs + min + a, c, sizeof(agent) * b);
 
-	for (i = 0; i < N; i++) {
-
-		if (LASTBIT(nt)) {
-                        SHR1(nt);
-                        continue;
+	for (i = 0; i < N; i++) 
+		if (!ISSET(n, i) && i != v1 && i != v2) {
+			a = Y(s, i);
+                	if (a > min && a < max) Y(s, i) = a + b;
                 }
-
-		SHR1(nt);
-                if (i == v1 || i == v2) continue;
-		e = Y(s, i);
-                if (e > min && e < max) Y(s, i) = e + k;
-
-		if ((e = g[i * N + v2])) {
-
-			register uint_fast64_t t, f;
-
-			if ((t = g[i * N + v1])) {
-
-				if (t < e) {
-					f = e;
-					e = t;
-				}
-				else f = t;
-
-				SET(h, f);
-			}
-
-			g[i * N + v1] = g[v1 * N + i] = e;
-			a[e * 2] = v1;
-			a[e * 2 + 1] = i;
-		}
-	}
 }
 
-void printcs(agent *s, agent *cs, contr n) {
+__attribute__((always_inline)) inline
+void contract(edge *g, agent *a, agent v1, agent v2, contr n, contr h, agent *s, agent *cs) {
+
+	merge(v1, v2, n, s, cs);
+	register uint_fast64_t i, e;
+
+	for (i = 0; i < N; i++) 
+		if (!ISSET(n, i) && i != v1 && i != v2) {
+			if ((e = g[i * N + v2])) {
+				register uint_fast64_t t, f;
+				if ((t = g[i * N + v1])) {
+					if (t < e) {
+						f = e;
+						e = t;
+					}
+					else f = t;
+					SET(h, f);
+				}
+				g[i * N + v1] = g[v1 * N + i] = e;
+				a[e * 2] = v1;
+				a[e * 2 + 1] = i;
+			}
+		}
+}
+
+void printcs(const agent *s, const agent *cs, const contr n, const dist *vc) {
 
         register agent i, j;
 
         for (i = 0; i < N; i++) if (!ISSET(n, i)) {
                 printf("{ ");
-                for (j = 0; j < X(s, i); j++) printf("%u ", cs[Y(s, i) + j]);
-                printf("}\n");
+                for (j = 0; j < X(s, i); j++) printf("%s%u%s ", i == cs[Y(s, i) + j] ? "<" : "", cs[Y(s, i) + j], i == cs[Y(s, i) + j] ? ">" : "");
+                printf("} = %f\n", vc[i]);
         }
+}
+
+__attribute__((always_inline)) inline
+agent insert(agent c, agent *b, agent bl, agent bu) {	
+
+	register agent i = 1, j, ht = CAR - c;
+	/* proceed down heap to bottom level */
+	while (i < bl) if (b[i *= 2] > ht) i++;
+	/* add weight to the correct bin */
+	b[ht = i] += c;
+	//printf("\t%d\t%u\t%u\n", i - bl, b[i] - c, c);
+	/* modify heap on the way back up */
+	for (i /= 2; i >= 1; i /= 2) {
+		j = 2 * i;
+		if (b[j + 1] < b[j]) j++;
+		if (b[i] == b[j]) break;
+		b[i] = b[j];
+	}
+
+	return 1 + ht - bl;
+}
+
+dist bound(const agentxy *oc, agent n, const dist *vc) {
+
+	register agent a = 0, b = 0, c, i, bu, bl = 1;
+	register dist bou = 0;
+	
+	// sum the value of the coalitions whose size is at least CEIL(CAR / 2)
+	while (oc[a].x >= (1 + ((CAR - 1) / 2)) && a < n) bou += vc[oc[a++].y];
+
+	// coalitions with size less than CEIL(CAR / 2)
+	dist d[n - a];
+	for (i = 0; i < n - a; i++) d[i] = vc[oc[a + i].y];
+
+	#define lt(a, b) (*(a) < *(b))
+	QSORT(dist, d, n - a, lt);
+	
+	//for (i = 0; i < n - a; i++) printf("%f ", d[i]);
+	//puts("");
+	
+	while (bl < n) bl *= 2;
+	bu = 2 * bl;
+	agent bins[bu];
+	memset(bins, 0, sizeof(agent) * bu);
+	
+	for (i = 0; i < n; i++) {
+		c = insert(oc[i].x, bins, bl, bu);
+		if (c > b) b = c;
+	}
+	
+	//printf("%u %u\n", a, b);
+	for (i = 0; i < b - a; i++) bou += d[i];
+
+	return bou;
+}
+
+__attribute__((always_inline)) inline
+void connect(const agent *a, edge e, contr n, const contr d, agent *s, agent *cs) {
+
+	register uint_fast64_t b, i, j, f, r;
+	agent q[N], l[N * N], h[N] = {0};
+
+	// create an adjacency list for each node, only considering the edges that can still be contracted
+	// iterate over the set of contractible edges and store for every node the list of its adjacent nodes
+	for (i = e + 1; i < E + 1; i++)
+		if (!ISSET(d, i)) {
+			r = a[i * 2];
+			f = l[r * N + h[r]++] = a[i * 2 + 1];
+			l[f * N + h[f]++] = r;
+		}	
+
+	/*
+	to compute the upperbound we consider the biggest connected components of the graph 
+	only the edges that can still be contracted are taken into account
+	note that this is automatically done by the construction of the above adjacency list
+	then we loop over the set of nodes and from each of them we do a BFS search, marking all the nodes that can be reached
+	if a node cannot be reached it's in another connected component and we start a new BFS search from that node
+	*/
+	for (i = 0; i < N; i++) {
+		if (!ISSET(n, i)) { // if node "i" has not been visited yet...
+			q[f = 0] = i; // put node "i" in the BFS queue 
+			r = 1;
+			do { // BFS loop
+				for (j = 0; j < h[q[f]]; j++) {
+					b = l[q[f] * N + j]; //  "b" can be reached from node "i"
+					if (!ISSET(n, b) && i != b) { 
+						q[r++] = b; // continue the search from this node too
+						SET(n, b); // mark "b" as visited
+						// merge the profile of node "b" on the profile of node "i"
+						merge(i, b, n, s, cs);
+					}
+				}
+				f++;
+			}
+			while (f != r);
+		}
+	}
+}
+
+const char *byte_to_binary(int x)
+{
+	static char b[65];
+	b[0] = '\0';
+
+	uint_fast64_t z;
+	for (z = (1ULL << 63); z > 0; z >>= 1)
+		strcat(b, ((x & z) == z) ? "1" : "0");
+
+	return b;
 }
 
 void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent *s, agent *cs, dist *vc, dist vcs, const dist *sp) {
 
 	count++;
 	__m128i h[R];
-	register dist nv;
 	register edge f, j;
-	register agent v1 = 0, v2;
-	typedef struct { agent x; agent y; } agentxy;
+	register dist nv = 0;
+	register agent v1 = 0, v2 = 0;
 
 	if (vcs < opt) {
-		printcs(s, cs, n);
+		printcs(s, cs, n, vc);
                 printf("new minimum %f\n", vcs);
 		opt = vcs;
 	}
-
-	agentxy oc[N];
+	
 	__m128i nt[R];
+	agent st[2 * N], cst[N];
 	memcpy(nt, n, sizeof(__m128i) * R);
+	memcpy(cst, csg, sizeof(agent) * N);
+	memcpy(st, sg, sizeof(agent) * 2 * N);
+	
+	/*printf ("%s %u\n",byte_to_binary(c[0][0]), e);
+	printcs(s, cs, nt, vc);
+	puts("asd");
+	printcs(st, cst, nt, vc);
+	puts("connected");*/
+	connect(a, e, nt, d, st, cst);
+	//printcs(st, cst, nt, vc);
+	//puts("fine");
+	agentxy oc[N];
 
-	for (f = 0; f < N; f++) {
-		if (!LASTBIT(nt)) {
-			oc[v1].x = X(s, f);
-			oc[v1++].y = f;
+	for (f = 0; f < N; f++)
+		if (!ISSET(nt, f)) {
+			v2 = v1;
+			for (j = 0; j < X(st, f); j++) {
+				oc[v1].x = X(s, oc[v1].y = cst[Y(st, f) + j]);
+				//printf("x=%u y=%u\n", oc[v1].x, oc[v1].y);
+				v1++;
+			}
+			//puts("");
+			#define gt(a, b) ((*(a)).x > (*(b)).x)
+			QSORT(agentxy, oc + v2, v1 - v2, gt);
+			nv += bound(oc + v2, v1 - v2, vc);
 		}
-		SHR1(nt);
-	}
-
-	#include "iqsort.h"
-	#define gt(a, b) ((*a).x > (*b).x)
-	QSORT(agentxy, oc, v1, gt);
+		
+	if (nv > opt) return;
 
 	for (f = e + 1; f < E + 1; f++)
 		if (!ISSET(d, f) && X(s, v1 = a[f * 2]) + X(s, v2 = a[f * 2 + 1]) <= CAR) {
@@ -538,8 +660,8 @@ int main(int argc, char *argv[]) {
 	dist *vc = malloc(sizeof(dist) * N * N);
 
 	for (i = 0; i < N; i++) {
-		X(s, i) = 1;
-		Y(s, i) = cs[i] = i;
+		X(sg, i) = X(s, i) = 1;
+		Y(sg, i) = Y(s, i) = csg[i] = cs[i] = i;
 		opt += (vc[i] = sp[4 * i * N + 2 * i + 1]);
 	}
 
