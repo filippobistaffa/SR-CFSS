@@ -21,12 +21,14 @@
 #define R3 6
 
 #define CARCOST 0
-#define DRIVERPERC 30
-#define MPERLITRE 15000
-#define POUNDPERLITRE 1.3
+#define DRIVERPERC 100
+#define METERSPERLITRE 15000
+#define PENNYPERLITRE 130
+
+#define MINGAIN 1
 
 #define SEED 1236468
-#define N 30
+#define N 20
 #define K 2
 
 #define D (N * DRIVERPERC / 100)
@@ -61,9 +63,9 @@ typedef __m128i *contr;
 typedef uint32_t coord;
 typedef uint16_t point;
 typedef uint16_t agent;
+typedef uint16_t penny;
 typedef uint16_t edge;
 typedef uint32_t id;
-typedef float pound;
 typedef float dist;
 
 typedef struct { point p; dist f; } item;

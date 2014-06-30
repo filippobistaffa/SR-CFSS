@@ -1,6 +1,6 @@
 #include "rs.h"
 
-pound opt;
+penny opt;
 uint64_t count;
 static agent csg[N];
 static agent sg[2 * N];
@@ -95,16 +95,7 @@ void minsse(dist *b, agent n) {
 }
 
 __attribute__((always_inline)) inline
-dist arraysum(const dist *buf, agent n) {
-
-	register agent i;
-	register dist sum = 0;
-	for (i = 0; i < n; i++) sum += buf[i];
-	return sum;
-}
-
-__attribute__((always_inline)) inline
-pound minpathcost(const agent *c, agent n, const dist *sp) {
+penny minpathcost(const agent *c, agent n, const dist *sp) {
 
 	dist r[R5];
 
@@ -129,7 +120,7 @@ pound minpathcost(const agent *c, agent n, const dist *sp) {
 			break;
 	}
 
-	return r[0] / MPERLITRE * POUNDPERLITRE;
+	return r[0] / METERSPERLITRE * PENNYPERLITRE;
 }
 
 __attribute__((always_inline)) inline
@@ -185,14 +176,14 @@ void contract(edge *g, agent *a, agent v1, agent v2, contr n, contr h, agent *s,
 		}
 }
 
-void printcs(const agent *s, const agent *cs, const contr n, const pound *vc) {
+void printcs(const agent *s, const agent *cs, const contr n, const penny *vc) {
 
         register agent i, j;
 
         for (i = 0; i < N; i++) if (!ISSET(n, i)) {
                 printf("{ ");
                 for (j = 0; j < X(s, i); j++) printf("%s%u%s ", i == cs[Y(s, i) + j] ? "<" : "", cs[Y(s, i) + j], i == cs[Y(s, i) + j] ? ">" : "");
-                printf("} = %.2f £\n", vc[i]);
+                printf("} = %up\n", vc[i]);
         }
 }
 
@@ -213,20 +204,20 @@ agent insert(agent c, agent *b, agent bl, agent bu) {
 }
 
 __attribute__((always_inline)) inline
-pound bound(const agentxy *oc, agent n, const pound *vc) {
+penny bound(const agentxy *oc, agent n, const penny *vc) {
 
 	register agent a = 0, b = 0, c, i, bu, bl = 1;
-	register pound bou = 0;
+	register penny bou = 0;
 
 	// sum the value of the coalitions whose size is at least CEIL(CAR / 2)
 	while (oc[a].x >= (1 + ((CAR - 1) / 2)) && a < n) bou += vc[oc[a++].y] + CARCOST;
 
 	// coalitions with size less than CEIL(CAR / 2)
-	pound d[n - a];
+	penny d[n - a];
 	for (i = 0; i < n - a; i++) d[i] = vc[oc[a + i].y] + CARCOST;
 
 	#define lt(a, b) (*(a) < *(b))
-	QSORT(pound, d, n - a, lt);
+	QSORT(penny, d, n - a, lt);
 
 	while (bl < n) bl *= 2;
 	bu = 2 * bl;
@@ -299,10 +290,10 @@ const char *byte_to_binary(int x)
 }
 
 __attribute__((always_inline)) inline
-uint8_t expand(const agent *a, edge e, const contr n, const contr d, const agent *s, const agent *cs, const pound *vc) {
+uint8_t expand(const agent *a, edge e, const contr n, const contr d, const agent *s, const agent *cs, const penny *vc) {
 
 	register agent i, j, x = 0, y = 0;
-	register pound nv = 0;
+	register penny nv = 0;
 	__m128i nt[R];
 	agent st[2 * N], cst[N];
 	memcpy(nt, n, sizeof(__m128i) * R);
@@ -323,11 +314,11 @@ uint8_t expand(const agent *a, edge e, const contr n, const contr d, const agent
 			nv += bound(oc + y, x - y, vc);
 		}
 
-	if (nv > opt) return 0;
-	else return 1;
+	if (nv <= opt - MINGAIN) return 1;
+	else return 0;
 }
 
-void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent *s, agent *cs, agent *dr, pound *vc, pound vcs, const dist *sp) {
+void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent *s, agent *cs, agent *dr, penny *vc, penny vcs, const dist *sp) {
 
 	count++;
 	__m128i h[R];
@@ -336,7 +327,7 @@ void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent
 
 	if (vcs < opt) {
 		printcs(s, cs, n, vc);
-                printf("new minimum %.2f £\n", vcs);
+                printf("new minimum %up\n", vcs);
 		opt = vcs;
 	}
 
@@ -381,26 +372,6 @@ void reheapdown(item *q, point root, point bottom) {
 		else break;
 	}
 }
-
-/*
-void reheapup(item *q, point root, point bottom) {
-
-	register point parent;
-	register item temp;
-
-	// Check base case in recursive calls.  If bottom's index is greater
-	// than the root index we have not finished recursively reheaping.
-	if (bottom > root) {
-		parent = (bottom - 1) / 2;
-		if (q[parent].f > q[bottom].f) {
-			temp = q[parent];
-			q[parent] = q[bottom];
-			q[bottom] = temp;
-			reheapup(q, root, parent);
-		}
-	}
-}
-*/
 
 __attribute__((always_inline)) inline
 void reheapup(item *q, point root, point bottom) {
@@ -643,7 +614,7 @@ int main(int argc, char *argv[]) {
 	agent *s = malloc(sizeof(agent) * 2 * N * N);
 	agent *cs = malloc(sizeof(agent) * N * N);
 	agent *dr = malloc(sizeof(agent) * N * N);
-	pound *vc = malloc(sizeof(pound) * N * N);
+	penny *vc = malloc(sizeof(penny) * N * N);
 
 	for (i = 0; i < D; i++) dr[i] = 1;
 	memset(dr + D, 0, sizeof(agent) * (N - D));
@@ -652,7 +623,7 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < N; i++) {
 		X(sg, i) = X(s, i) = 1;
 		Y(sg, i) = Y(s, i) = csg[i] = cs[i] = i;
-		opt += (vc[i] = sp[4 * i * N + 2 * i + 1] / MPERLITRE * POUNDPERLITRE) + CARCOST;
+		opt += (vc[i] = sp[4 * i * N + 2 * i + 1] / METERSPERLITRE * PENNYPERLITRE) + CARCOST;
 	}
 
 	init(SEED);
