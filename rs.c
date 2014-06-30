@@ -1,6 +1,6 @@
 #include "rs.h"
 
-dist opt;
+pound opt;
 uint64_t count;
 static agent csg[N];
 static agent sg[2 * N];
@@ -104,7 +104,7 @@ dist arraysum(const dist *buf, agent n) {
 }
 
 __attribute__((always_inline)) inline
-dist minpath(const agent *c, agent n, const dist *sp) {
+pound minpathcost(const agent *c, agent n, const dist *sp) {
 
 	dist r[R5];
 
@@ -129,7 +129,7 @@ dist minpath(const agent *c, agent n, const dist *sp) {
 			break;
 	}
 
-	return r[0];
+	return r[0] / MPERLITRE * POUNDPERLITRE;
 }
 
 __attribute__((always_inline)) inline
@@ -153,7 +153,7 @@ void merge(agent v1, agent v2, contr n, agent *s, agent *cs) {
 	memmove(cs + min + a + b, cs + min + a, sizeof(agent) * (max - min - a));
 	memcpy(cs + min + a, c, sizeof(agent) * b);
 
-	for (i = 0; i < N; i++) 
+	for (i = 0; i < N; i++)
 		if (!ISSET(n, i) && i != v1 && i != v2) {
 			a = Y(s, i);
                 	if (a > min && a < max) Y(s, i) = a + b;
@@ -166,7 +166,7 @@ void contract(edge *g, agent *a, agent v1, agent v2, contr n, contr h, agent *s,
 	merge(v1, v2, n, s, cs);
 	register uint_fast64_t i, e;
 
-	for (i = 0; i < N; i++) 
+	for (i = 0; i < N; i++)
 		if (!ISSET(n, i) && i != v1 && i != v2) {
 			if ((e = g[i * N + v2])) {
 				register uint_fast64_t t, f;
@@ -185,27 +185,23 @@ void contract(edge *g, agent *a, agent v1, agent v2, contr n, contr h, agent *s,
 		}
 }
 
-void printcs(const agent *s, const agent *cs, const contr n, const dist *vc) {
+void printcs(const agent *s, const agent *cs, const contr n, const pound *vc) {
 
         register agent i, j;
 
         for (i = 0; i < N; i++) if (!ISSET(n, i)) {
                 printf("{ ");
                 for (j = 0; j < X(s, i); j++) printf("%s%u%s ", i == cs[Y(s, i) + j] ? "<" : "", cs[Y(s, i) + j], i == cs[Y(s, i) + j] ? ">" : "");
-                printf("} = %f\n", vc[i]);
+                printf("} = %.2f £\n", vc[i]);
         }
 }
 
 __attribute__((always_inline)) inline
-agent insert(agent c, agent *b, agent bl, agent bu) {	
+agent insert(agent c, agent *b, agent bl, agent bu) {
 
 	register agent i = 1, j, ht = CAR - c;
-	/* proceed down heap to bottom level */
 	while (i < bl) if (b[i *= 2] > ht) i++;
-	/* add weight to the correct bin */
 	b[ht = i] += c;
-	//printf("\t%d\t%u\t%u\n", i - bl, b[i] - c, c);
-	/* modify heap on the way back up */
 	for (i /= 2; i >= 1; i /= 2) {
 		j = 2 * i;
 		if (b[j + 1] < b[j]) j++;
@@ -216,35 +212,32 @@ agent insert(agent c, agent *b, agent bl, agent bu) {
 	return 1 + ht - bl;
 }
 
-dist bound(const agentxy *oc, agent n, const dist *vc) {
+__attribute__((always_inline)) inline
+pound bound(const agentxy *oc, agent n, const pound *vc) {
 
 	register agent a = 0, b = 0, c, i, bu, bl = 1;
-	register dist bou = 0;
-	
+	register pound bou = 0;
+
 	// sum the value of the coalitions whose size is at least CEIL(CAR / 2)
-	while (oc[a].x >= (1 + ((CAR - 1) / 2)) && a < n) bou += vc[oc[a++].y];
+	while (oc[a].x >= (1 + ((CAR - 1) / 2)) && a < n) bou += vc[oc[a++].y] + CARCOST;
 
 	// coalitions with size less than CEIL(CAR / 2)
-	dist d[n - a];
-	for (i = 0; i < n - a; i++) d[i] = vc[oc[a + i].y];
+	pound d[n - a];
+	for (i = 0; i < n - a; i++) d[i] = vc[oc[a + i].y] + CARCOST;
 
 	#define lt(a, b) (*(a) < *(b))
-	QSORT(dist, d, n - a, lt);
-	
-	//for (i = 0; i < n - a; i++) printf("%f ", d[i]);
-	//puts("");
-	
+	QSORT(pound, d, n - a, lt);
+
 	while (bl < n) bl *= 2;
 	bu = 2 * bl;
 	agent bins[bu];
 	memset(bins, 0, sizeof(agent) * bu);
-	
+
 	for (i = 0; i < n; i++) {
 		c = insert(oc[i].x, bins, bl, bu);
 		if (c > b) b = c;
 	}
-	
-	//printf("%u %u\n", a, b);
+
 	for (i = 0; i < b - a; i++) bou += d[i];
 
 	return bou;
@@ -258,12 +251,12 @@ void connect(const agent *a, edge e, contr n, const contr d, agent *s, agent *cs
 
 	// create an adjacency list for each node, only considering the edges that can still be contracted
 	// iterate over the set of contractible edges and store for every node the list of its adjacent nodes
-	for (i = e + 1; i < E + 1; i++)
+	for (i = e; i < E + 1; i++)
 		if (!ISSET(d, i)) {
 			r = a[i * 2];
 			f = l[r * N + h[r]++] = a[i * 2 + 1];
 			l[f * N + h[f]++] = r;
-		}	
+		}
 
 	/*
 	to compute the upperbound we consider the biggest connected components of the graph 
@@ -305,66 +298,64 @@ const char *byte_to_binary(int x)
 	return b;
 }
 
-void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent *s, agent *cs, dist *vc, dist vcs, const dist *sp) {
+__attribute__((always_inline)) inline
+uint8_t expand(const agent *a, edge e, const contr n, const contr d, const agent *s, const agent *cs, const pound *vc) {
 
-	count++;
-	__m128i h[R];
-	register edge f, j;
-	register dist nv = 0;
-	register agent v1 = 0, v2 = 0;
-
-	if (vcs < opt) {
-		printcs(s, cs, n, vc);
-                printf("new minimum %f\n", vcs);
-		opt = vcs;
-	}
-	
+	register agent i, j, x = 0, y = 0;
+	register pound nv = 0;
 	__m128i nt[R];
 	agent st[2 * N], cst[N];
 	memcpy(nt, n, sizeof(__m128i) * R);
 	memcpy(cst, csg, sizeof(agent) * N);
 	memcpy(st, sg, sizeof(agent) * 2 * N);
-	
-	/*printf ("%s %u\n",byte_to_binary(c[0][0]), e);
-	printcs(s, cs, nt, vc);
-	puts("asd");
-	printcs(st, cst, nt, vc);
-	puts("connected");*/
 	connect(a, e, nt, d, st, cst);
-	//printcs(st, cst, nt, vc);
-	//puts("fine");
 	agentxy oc[N];
 
-	for (f = 0; f < N; f++)
-		if (!ISSET(nt, f)) {
-			v2 = v1;
-			for (j = 0; j < X(st, f); j++) {
-				oc[v1].x = X(s, oc[v1].y = cst[Y(st, f) + j]);
-				//printf("x=%u y=%u\n", oc[v1].x, oc[v1].y);
-				v1++;
+	for (i = 0; i < N; i++)
+		if (!ISSET(nt, i)) {
+			y = x;
+			for (j = 0; j < X(st, i); j++) {
+				oc[x].x = X(s, oc[x].y = cst[Y(st, i) + j]);
+				x++;
 			}
-			//puts("");
 			#define gt(a, b) ((*(a)).x > (*(b)).x)
-			QSORT(agentxy, oc + v2, v1 - v2, gt);
-			nv += bound(oc + v2, v1 - v2, vc);
+			QSORT(agentxy, oc + y, x - y, gt);
+			nv += bound(oc + y, x - y, vc);
 		}
-		
-	if (nv > opt) return;
+
+	if (nv > opt) return 0;
+	else return 1;
+}
+
+void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent *s, agent *cs, agent *dr, pound *vc, pound vcs, const dist *sp) {
+
+	count++;
+	__m128i h[R];
+	register edge f, j;
+	register agent v1, v2, ndr;
+
+	if (vcs < opt) {
+		printcs(s, cs, n, vc);
+                printf("new minimum %.2f £\n", vcs);
+		opt = vcs;
+	}
 
 	for (f = e + 1; f < E + 1; f++)
-		if (!ISSET(d, f) && X(s, v1 = a[f * 2]) + X(s, v2 = a[f * 2 + 1]) <= CAR) {
+		if (!ISSET(d, f) && X(s, v1 = a[f * 2]) + X(s, v2 = a[f * 2 + 1]) <= CAR && (ndr = dr[v1] + dr[v2]) && expand(a, f, n, d, s, cs, vc)) {
 			memcpy(g + N * N, g, sizeof(edge) * N * N);
 			memcpy(a + 2 * (E + 1), a, sizeof(agent) * 2 * (E + 1));
 			memcpy(s + 2 * N, s, sizeof(agent) * 2 * N);
 			memcpy(cs + N, cs, sizeof(agent) * N);
+			memcpy(dr + N, dr, sizeof(agent) * N);
+			dr[N + v1] = ndr;
 			memcpy(vc + N, vc, sizeof(dist) * N);
 			for (j = 0; j < R; j++) h[j] = _mm_setzero_si128();
 			contract(g + N * N, a + 2 * (E + 1), v1, v2, n, h, s + 2 * N, cs + N);
-			nv = vc[N + v1] = minpath(cs + N + Y(s + 2 * N, v1), X(s + 2 * N, v1), sp);
+			register dist nv = vc[N + v1] = minpathcost(cs + N + Y(s + 2 * N, v1), X(s + 2 * N, v1), sp);
 			SET(n, v2);
 			SET(c, f);
 			OR(d, h);
-			edgecontraction(g + N * N, a + 2 * (E + 1), f, n, c, d, s + 2 * N, cs + N, vc + N, vcs + nv - vc[v1] - vc[v2], sp);
+			edgecontraction(g + N * N, a + 2 * (E + 1), f, n, c, d, s + 2 * N, cs + N, dr + N, vc + N, vcs + nv - vc[v1] - vc[v2] - CARCOST, sp);
 			CLEAR(n, v2);
 			CLEAR(c, f);
 			ANDNOT(d, h);
@@ -644,12 +635,6 @@ int main(int argc, char *argv[]) {
 		for (j = i + 1; j < 2 * N; j++)
 			sp[i * 2 * N + j] = sp[j * 2 * N + i] = astar(stops[i], stops[j], nodes, idx, adj, ds);
 
-	//for (i = 0; i < 2 * N; i++) {
-	//	for (j = 0; j < 2 * N; j++)
-	//		printf("% 12.5f ", sp[j * 2 * N + i]);
-	//	puts("");
-	//}
-
 	free(ds);
 	free(adj);
 	edge *g = malloc(sizeof(edge) * N * N * N);
@@ -657,12 +642,17 @@ int main(int argc, char *argv[]) {
 	agent *a = malloc(sizeof(agent) * N * 2 * (E + 1));
 	agent *s = malloc(sizeof(agent) * 2 * N * N);
 	agent *cs = malloc(sizeof(agent) * N * N);
-	dist *vc = malloc(sizeof(dist) * N * N);
+	agent *dr = malloc(sizeof(agent) * N * N);
+	pound *vc = malloc(sizeof(pound) * N * N);
+
+	for (i = 0; i < D; i++) dr[i] = 1;
+	memset(dr + D, 0, sizeof(agent) * (N - D));
+	shuffle(dr, N, sizeof(agent));
 
 	for (i = 0; i < N; i++) {
 		X(sg, i) = X(s, i) = 1;
 		Y(sg, i) = Y(s, i) = csg[i] = cs[i] = i;
-		opt += (vc[i] = sp[4 * i * N + 2 * i + 1]);
+		opt += (vc[i] = sp[4 * i * N + 2 * i + 1] / MPERLITRE * POUNDPERLITRE) + CARCOST;
 	}
 
 	init(SEED);
@@ -672,7 +662,7 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < R; i++)
 		n[i] = c[i] = d[i] = _mm_setzero_si128();
 
-	edgecontraction(g, a, 0, n, c, d, s, cs, vc, opt, sp);
+	edgecontraction(g, a, 0, n, c, d, s, cs, dr, vc, opt, sp);
 	gettimeofday(&t2, NULL);
 	printf("%zu CSs\n", count);
 
@@ -681,6 +671,7 @@ int main(int argc, char *argv[]) {
 
 	free(stops);
 	free(idx);
+	free(dr);
 	free(cs);
 	free(xy);
 	free(sp);
