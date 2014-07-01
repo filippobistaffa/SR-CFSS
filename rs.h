@@ -20,14 +20,14 @@
 #define R4 90
 #define R3 6
 
-#define CARCOST 0
-#define DRIVERPERC 100
-#define METERSPERLITRE 15000
+#define CARCOST 100
+#define TICKETCOST 300
 #define PENNYPERLITRE 130
-
+#define METERSPERLITRE 15000
+#define DRIVERPERC 10
 #define MINGAIN 1
 
-#define SEED 1236468
+#define SEED 148524
 #define N 20
 #define K 2
 
@@ -35,6 +35,8 @@
 #define E (K * N - (K * (K + 1)) / 2)
 #define R (1 + (((E > N ? E : N) - 1) / 128))
 
+#define COST(i, dr, l) ((dr)[(i)] ? PATHCOST(i, l) : TICKETCOST)
+#define PATHCOST(i, l) lroundf((float)(l)[(i)] / METERSPERLITRE * PENNYPERLITRE + CARCOST)
 #define DIST(dx, dy) (sqrt((dx) * (dx) + (dy) * (dy)))
 #define X(v, i) ((v)[2 * (i)])
 #define Y(v, i) ((v)[2 * (i) + 1])
@@ -60,7 +62,7 @@
 })
 
 typedef __m128i *contr;
-typedef uint32_t coord;
+typedef uint32_t meter;
 typedef uint16_t point;
 typedef uint16_t agent;
 typedef uint16_t penny;

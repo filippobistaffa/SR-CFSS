@@ -95,38 +95,50 @@ void minsse(dist *b, agent n) {
 }
 
 __attribute__((always_inline)) inline
-penny minpathcost(const agent *c, agent n, const dist *sp) {
+meter minpath(agent *c, agent n, agent dr, const dist *sp) {
 
 	dist r[R5];
+	register agent t, i = 1;
+	register dist min = FLT_MAX;
 
-	switch (n) {
-		case 5:
-			#include "paths5.h"
-			minsse(r, R5);
-			break;
-		case 4:
-			#include "paths4.h"
-			minsse(r, R4);
-			break;
-		case 3:
-			#include "paths3.h"
-			minsse(r, R3);
-			break;
-		case 2:
-			#include "paths2.h"
-			break;
-		default:
-			#include "paths1.h"
-			break;
-	}
+	do {
+		switch (n) {
+			case 5:
+				#include "paths5.h"
+				minsse(r, R5);
+				break;
+			case 4:
+				#include "paths4.h"
+				minsse(r, R4);
+				break;
+			case 3:
+				#include "paths3.h"
+				minsse(r, R3);
+				break;
+			case 2:
+				#include "paths2.h"
+				break;
+			default:
+				#include "paths1.h"
+				break;
+		}
 
-	return r[0] / METERSPERLITRE * PENNYPERLITRE;
+		if (r[0] < min) min = r[0];
+
+		if (dr != 1) {
+			t = c[0];
+			c[0] = c[i];
+			c[i++] = t;
+		}
+	} while (--dr);
+
+	return lroundf(min);
 }
 
 __attribute__((always_inline)) inline
-void merge(agent v1, agent v2, contr n, agent *s, agent *cs) {
+void merge(agent v1, agent v2, contr n, agent *s, agent *cs, agent *dr) {
 
-	register agent a, b, i, min = v1, max = v2;
+	register agent a, b, da, db, i, min = v1, max = v2;
 
 	if (Y(s, max) < Y(s, min)) {
 		b = max;
@@ -136,13 +148,18 @@ void merge(agent v1, agent v2, contr n, agent *s, agent *cs) {
 
 	a = X(s, min);
 	b = X(s, max);
+	da = dr[min];
+	db = dr[max];
 	max = Y(s, max);
 	Y(s, v1) = min = Y(s, min);
+	dr[v1] = da + db;
 	agent c[b];
 	X(s, v1) = a + b;
 	memcpy(c, cs + max, sizeof(agent) * b);
 	memmove(cs + min + a + b, cs + min + a, sizeof(agent) * (max - min - a));
-	memcpy(cs + min + a, c, sizeof(agent) * b);
+	memmove(cs + min + da + db, cs + min + da, sizeof(agent) * (a - da));
+	memcpy(cs + min + da, c, sizeof(agent) * db);
+	memcpy(cs + min + a + db, c + db, sizeof(agent) * (b - db));
 
 	for (i = 0; i < N; i++)
 		if (!ISSET(n, i) && i != v1 && i != v2) {
@@ -154,7 +171,6 @@ void merge(agent v1, agent v2, contr n, agent *s, agent *cs) {
 __attribute__((always_inline)) inline
 void contract(edge *g, agent *a, agent v1, agent v2, contr n, contr h, agent *s, agent *cs) {
 
-	merge(v1, v2, n, s, cs);
 	register uint_fast64_t i, e;
 
 	for (i = 0; i < N; i++)
@@ -176,14 +192,14 @@ void contract(edge *g, agent *a, agent v1, agent v2, contr n, contr h, agent *s,
 		}
 }
 
-void printcs(const agent *s, const agent *cs, const contr n, const penny *vc) {
+void printcs(const agent *s, const agent *cs, const contr n, const agent *dr, const meter *l) {
 
         register agent i, j;
 
         for (i = 0; i < N; i++) if (!ISSET(n, i)) {
                 printf("{ ");
-                for (j = 0; j < X(s, i); j++) printf("%s%u%s ", i == cs[Y(s, i) + j] ? "<" : "", cs[Y(s, i) + j], i == cs[Y(s, i) + j] ? ">" : "");
-                printf("} = %up\n", vc[i]);
+                for (j = 0; j < X(s, i); j++) printf("%s%u%s%s ", i == cs[Y(s, i) + j] ? "<" : "", cs[Y(s, i) + j], i == cs[Y(s, i) + j] ? ">" : "", j < dr[i] ? "*" : "");
+                printf("} (%um) = %lup\n", l[i], COST(i, dr, l));
         }
 }
 
@@ -204,17 +220,18 @@ agent insert(agent c, agent *b, agent bl, agent bu) {
 }
 
 __attribute__((always_inline)) inline
-penny bound(const agentxy *oc, agent n, const penny *vc) {
+penny bound(const agentxy *oc, agent n, const agent *dr, const meter *l) {
 
+	if (n == 1) return COST(oc[0].y, dr, l);
 	register agent a = 0, b = 0, c, i, bu, bl = 1;
 	register penny bou = 0;
 
 	// sum the value of the coalitions whose size is at least CEIL(CAR / 2)
-	while (oc[a].x >= (1 + ((CAR - 1) / 2)) && a < n) bou += vc[oc[a++].y] + CARCOST;
+	while (oc[a].x >= (1 + ((CAR - 1) / 2)) && a < n) bou += PATHCOST(oc[a++].y, l);
 
 	// coalitions with size less than CEIL(CAR / 2)
 	penny d[n - a];
-	for (i = 0; i < n - a; i++) d[i] = vc[oc[a + i].y] + CARCOST;
+	for (i = 0; i < n - a; i++) d[i] = PATHCOST(oc[a + i].y, l);
 
 	#define lt(a, b) (*(a) < *(b))
 	QSORT(penny, d, n - a, lt);
@@ -230,7 +247,6 @@ penny bound(const agentxy *oc, agent n, const penny *vc) {
 	}
 
 	for (i = 0; i < b - a; i++) bou += d[i];
-
 	return bou;
 }
 
@@ -238,7 +254,7 @@ __attribute__((always_inline)) inline
 void connect(const agent *a, edge e, contr n, const contr d, agent *s, agent *cs) {
 
 	register uint_fast64_t b, i, j, f, r;
-	agent q[N], l[N * N], h[N] = {0};
+	agent q[N], l[N * N], h[N] = {0}, dr[N] = {1};
 
 	// create an adjacency list for each node, only considering the edges that can still be contracted
 	// iterate over the set of contractible edges and store for every node the list of its adjacent nodes
@@ -267,7 +283,7 @@ void connect(const agent *a, edge e, contr n, const contr d, agent *s, agent *cs
 						q[r++] = b; // continue the search from this node too
 						SET(n, b); // mark "b" as visited
 						// merge the profile of node "b" on the profile of node "i"
-						merge(i, b, n, s, cs);
+						merge(i, b, n, s, cs, dr);
 					}
 				}
 				f++;
@@ -290,7 +306,7 @@ const char *byte_to_binary(int x)
 }
 
 __attribute__((always_inline)) inline
-uint8_t expand(const agent *a, edge e, const contr n, const contr d, const agent *s, const agent *cs, const penny *vc) {
+uint8_t expand(const agent *a, edge e, const contr n, const contr d, const agent *s, const agent *cs, const agent *dr, const meter *l) {
 
 	register agent i, j, x = 0, y = 0;
 	register penny nv = 0;
@@ -311,42 +327,42 @@ uint8_t expand(const agent *a, edge e, const contr n, const contr d, const agent
 			}
 			#define gt(a, b) ((*(a)).x > (*(b)).x)
 			QSORT(agentxy, oc + y, x - y, gt);
-			nv += bound(oc + y, x - y, vc);
+			nv += bound(oc + y, x - y, dr, l);
 		}
 
 	if (nv <= opt - MINGAIN) return 1;
 	else return 0;
 }
 
-void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent *s, agent *cs, agent *dr, penny *vc, penny vcs, const dist *sp) {
+void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent *s, agent *cs, agent *dr, meter *l, penny tot, const dist *sp) {
 
 	count++;
 	__m128i h[R];
 	register edge f, j;
-	register agent v1, v2, ndr;
+	register agent v1, v2;
 
-	if (vcs < opt) {
-		printcs(s, cs, n, vc);
-                printf("new minimum %up\n", vcs);
-		opt = vcs;
+	if (tot < opt) {
+		printcs(s, cs, n, dr, l);
+                printf("new minimum %up\n", tot);
+		opt = tot;
 	}
 
 	for (f = e + 1; f < E + 1; f++)
-		if (!ISSET(d, f) && X(s, v1 = a[f * 2]) + X(s, v2 = a[f * 2 + 1]) <= CAR && (ndr = dr[v1] + dr[v2]) && expand(a, f, n, d, s, cs, vc)) {
+		if (!ISSET(d, f) && X(s, v1 = a[f * 2]) + X(s, v2 = a[f * 2 + 1]) <= CAR && dr[v1] + dr[v2] && expand(a, f, n, d, s, cs, dr, l)) {
 			memcpy(g + N * N, g, sizeof(edge) * N * N);
 			memcpy(a + 2 * (E + 1), a, sizeof(agent) * 2 * (E + 1));
 			memcpy(s + 2 * N, s, sizeof(agent) * 2 * N);
 			memcpy(cs + N, cs, sizeof(agent) * N);
 			memcpy(dr + N, dr, sizeof(agent) * N);
-			dr[N + v1] = ndr;
-			memcpy(vc + N, vc, sizeof(dist) * N);
+			memcpy(l + N, l, sizeof(meter) * N);
 			for (j = 0; j < R; j++) h[j] = _mm_setzero_si128();
+			merge(v1, v2, n, s + 2 * N, cs + N, dr + N);
 			contract(g + N * N, a + 2 * (E + 1), v1, v2, n, h, s + 2 * N, cs + N);
-			register dist nv = vc[N + v1] = minpathcost(cs + N + Y(s + 2 * N, v1), X(s + 2 * N, v1), sp);
+			l[N + v1] = minpath(cs + N + Y(s + 2 * N, v1), X(s + 2 * N, v1), dr[N + v1], sp);
 			SET(n, v2);
 			SET(c, f);
 			OR(d, h);
-			edgecontraction(g + N * N, a + 2 * (E + 1), f, n, c, d, s + 2 * N, cs + N, dr + N, vc + N, vcs + nv - vc[v1] - vc[v2] - CARCOST, sp);
+			edgecontraction(g + N * N, a + 2 * (E + 1), f, n, c, d, s + 2 * N, cs + N, dr + N, l + N, tot + COST(v1, dr + N, l + N) - COST(v1, dr, l) - COST(v2, dr, l), sp);
 			CLEAR(n, v2);
 			CLEAR(c, f);
 			ANDNOT(d, h);
@@ -552,8 +568,8 @@ int main(int argc, char *argv[]) {
 	f = fopen(XY, "rb");
 	fread(&nodes, sizeof(point), 1, f);
 
-	coord *xy = malloc(sizeof(coord) * 2 * nodes);
-	fread(xy, sizeof(coord), 2 * nodes, f);
+	meter *xy = malloc(sizeof(meter) * 2 * nodes);
+	fread(xy, sizeof(meter), 2 * nodes, f);
 	fclose(f);
 
 	// adjaciency list
@@ -614,7 +630,7 @@ int main(int argc, char *argv[]) {
 	agent *s = malloc(sizeof(agent) * 2 * N * N);
 	agent *cs = malloc(sizeof(agent) * N * N);
 	agent *dr = malloc(sizeof(agent) * N * N);
-	penny *vc = malloc(sizeof(penny) * N * N);
+	meter *l = malloc(sizeof(meter) * N * N);
 
 	for (i = 0; i < D; i++) dr[i] = 1;
 	memset(dr + D, 0, sizeof(agent) * (N - D));
@@ -623,7 +639,8 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < N; i++) {
 		X(sg, i) = X(s, i) = 1;
 		Y(sg, i) = Y(s, i) = csg[i] = cs[i] = i;
-		opt += (vc[i] = sp[4 * i * N + 2 * i + 1] / METERSPERLITRE * PENNYPERLITRE) + CARCOST;
+		l[i] = sp[4 * i * N + 2 * i + 1];
+		opt += COST(i, dr, l);
 	}
 
 	init(SEED);
@@ -633,7 +650,8 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < R; i++)
 		n[i] = c[i] = d[i] = _mm_setzero_si128();
 
-	edgecontraction(g, a, 0, n, c, d, s, cs, dr, vc, opt, sp);
+	printcs(s, cs, n, dr, l);
+	edgecontraction(g, a, 0, n, c, d, s, cs, dr, l, opt, sp);
 	gettimeofday(&t2, NULL);
 	printf("%zu CSs\n", count);
 
@@ -646,7 +664,7 @@ int main(int argc, char *argv[]) {
 	free(cs);
 	free(xy);
 	free(sp);
-	free(vc);
+	free(l);
 	free(g);
 	free(a);
 	free(s);
