@@ -25,10 +25,10 @@
 #define PENNYPERLITRE 130
 #define METERSPERLITRE 15000
 #define DRIVERPERC 10
-#define MINGAIN 1
+#define MINGAIN 500
 
-#define SEED 148524
-#define N 20
+#define SEED 484545
+#define N 50
 #define K 2
 
 #define D (N * DRIVERPERC / 100)
@@ -36,6 +36,7 @@
 #define R (1 + (((E > N ? E : N) - 1) / 128))
 
 #define ROUND(i) ((penny)(i))
+#define POUND(i) ((float)(i) / 100)
 #define COST(i, dr, l) ((dr)[(i)] ? PATHCOST(i, l) : TICKETCOST)
 #define PATHCOST(i, l) ROUND((float)(l)[(i)] / METERSPERLITRE * PENNYPERLITRE + CARCOST)
 #define DIST(dx, dy) (sqrt((dx) * (dx) + (dy) * (dy)))

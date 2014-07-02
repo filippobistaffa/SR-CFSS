@@ -1,7 +1,9 @@
 #include "rs.h"
 
-penny opt;
 uint64_t count;
+static uint64_t split[E];
+
+penny opt;
 static agent csg[N];
 static agent sg[2 * N];
 
@@ -199,7 +201,7 @@ void printcs(const agent *s, const agent *cs, const contr n, const agent *dr, co
         for (i = 0; i < N; i++) if (!ISSET(n, i)) {
                 printf("{ ");
                 for (j = 0; j < X(s, i); j++) printf("%s%u%s%s ", i == cs[Y(s, i) + j] ? "<" : "", cs[Y(s, i) + j], i == cs[Y(s, i) + j] ? ">" : "", j < dr[i] ? "*" : "");
-                printf("} (%um) = %up\n", l[i], COST(i, dr, l));
+                printf("} (%um) = %.2f£\n", l[i], POUND(COST(i, dr, l)));
         }
 }
 
@@ -334,16 +336,17 @@ uint8_t expand(const agent *a, edge e, const contr n, const contr d, const agent
 	else return 0;
 }
 
-void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent *s, agent *cs, agent *dr, meter *l, penny tot, const dist *sp) {
+void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent *s, agent *cs, agent *dr, meter *l, penny tot, const dist *sp, uint64_t *cnt) {
 
 	count++;
+	if (cnt) (*cnt)++;
 	__m128i h[R];
 	register edge f, j;
 	register agent v1, v2;
 
 	if (tot < opt) {
-		printcs(s, cs, n, dr, l);
-                printf("new minimum %up\n", tot);
+		//printcs(s, cs, n, dr, l);
+                printf("%.2f£\n", POUND(tot));
 		opt = tot;
 	}
 
@@ -362,7 +365,7 @@ void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent
 			SET(n, v2);
 			SET(c, f);
 			OR(d, h);
-			edgecontraction(g + N * N, a + 2 * (E + 1), f, n, c, d, s + 2 * N, cs + N, dr + N, l + N, tot + COST(v1, dr + N, l + N) - COST(v1, dr, l) - COST(v2, dr, l), sp);
+			edgecontraction(g + N * N, a + 2 * (E + 1), f, n, c, d, s + 2 * N, cs + N, dr + N, l + N, tot + COST(v1, dr + N, l + N) - COST(v1, dr, l) - COST(v2, dr, l), sp, cnt ? cnt : split + f - 1);
 			CLEAR(n, v2);
 			CLEAR(c, f);
 			ANDNOT(d, h);
@@ -650,10 +653,13 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < R; i++)
 		n[i] = c[i] = d[i] = _mm_setzero_si128();
 
-	printcs(s, cs, n, dr, l);
-	edgecontraction(g, a, 0, n, c, d, s, cs, dr, l, opt, sp);
+	//printcs(s, cs, n, dr, l);
+	edgecontraction(g, a, 0, n, c, d, s, cs, dr, l, opt, sp, NULL);
 	gettimeofday(&t2, NULL);
 	printf("%zu CSs\n", count);
+
+	for (i = 0; i < E; i++)
+		if (split[i]) printf("%zu CSs (%.2f%%)\n", split[i], (double)split[i] * 100 / (count - 1));
 
 	printf("Checksum = %u (size = %zu bytes)\n", crc32(sp, sizeof(dist) * 4 * N * N), sizeof(dist) * 4 * N * N);
 	printf("%f seconds\n", (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
