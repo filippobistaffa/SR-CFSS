@@ -132,7 +132,7 @@ meter minpath(agent *c, agent n, agent dr, const dist *sp) {
 		}
 	} while (--dr);
 
-	return lroundf(min);
+	return ROUND(min);
 }
 
 __attribute__((always_inline)) inline
@@ -199,7 +199,7 @@ void printcs(const agent *s, const agent *cs, const contr n, const agent *dr, co
         for (i = 0; i < N; i++) if (!ISSET(n, i)) {
                 printf("{ ");
                 for (j = 0; j < X(s, i); j++) printf("%s%u%s%s ", i == cs[Y(s, i) + j] ? "<" : "", cs[Y(s, i) + j], i == cs[Y(s, i) + j] ? ">" : "", j < dr[i] ? "*" : "");
-                printf("} (%um) = %lup\n", l[i], COST(i, dr, l));
+                printf("} (%um) = %up\n", l[i], COST(i, dr, l));
         }
 }
 
@@ -617,7 +617,7 @@ int main(int argc, char *argv[]) {
 	dist *sp = calloc(4 * N * N, sizeof(dist));
 	printf("Using %u threads\n", omp_get_max_threads());
 
-	#pragma omp parallel for schedule(dynamic) private(i, j)
+	//#pragma omp parallel for schedule(dynamic) private(i, j)
 	for (i = 0; i < 2 * N; i++)
 		for (j = i + 1; j < 2 * N; j++)
 			sp[i * 2 * N + j] = sp[j * 2 * N + i] = astar(stops[i], stops[j], nodes, idx, adj, ds);

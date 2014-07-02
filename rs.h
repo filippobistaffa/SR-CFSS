@@ -35,8 +35,9 @@
 #define E (K * N - (K * (K + 1)) / 2)
 #define R (1 + (((E > N ? E : N) - 1) / 128))
 
+#define ROUND(i) ((penny)(i))
 #define COST(i, dr, l) ((dr)[(i)] ? PATHCOST(i, l) : TICKETCOST)
-#define PATHCOST(i, l) lroundf((float)(l)[(i)] / METERSPERLITRE * PENNYPERLITRE + CARCOST)
+#define PATHCOST(i, l) ROUND((float)(l)[(i)] / METERSPERLITRE * PENNYPERLITRE + CARCOST)
 #define DIST(dx, dy) (sqrt((dx) * (dx) + (dy) * (dy)))
 #define X(v, i) ((v)[2 * (i)])
 #define Y(v, i) ((v)[2 * (i) + 1])
