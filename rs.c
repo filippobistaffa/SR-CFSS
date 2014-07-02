@@ -254,7 +254,7 @@ penny bound(const agentxy *oc, agent n, agent cars, const meter *l) {
 }
 
 __attribute__((always_inline)) inline
-void connect(const agent *a, edge e, contr n, const contr d, agent *s, agent *cs, agent *cars) {
+void connect(const agent *a, edge e, contr n, const contr d, agent *s, agent *cs, agent *cars, agent *sts) {
 
 	register uint_fast64_t b, i, j, f, r;
 	agent q[N], l[N * N], h[N] = {0}, drt[N] = {0};
@@ -285,9 +285,9 @@ void connect(const agent *a, edge e, contr n, const contr d, agent *s, agent *cs
 					if (!ISSET(n, b) && i != b) { 
 						q[r++] = b; // continue the search from this node too
 						SET(n, b); // mark "b" as visited
-						// merge the profile of node "b" on the profile of node "i"
 						merge(i, b, n, s, cs, drt);
 						cars[i] += cars[b];
+						sts[i] += sts[b];
 					}
 				}
 				f++;
@@ -297,14 +297,14 @@ void connect(const agent *a, edge e, contr n, const contr d, agent *s, agent *cs
 	}
 }
 
-const char *byte_to_binary(int x)
+const char *contr2binary(contr x)
 {
-	static char b[65];
+	register agent n = 128 * R;
+	static char b[1 + 128 * R];
 	b[0] = '\0';
 
-	uint_fast64_t z;
-	for (z = (1ULL << 63); z > 0; z >>= 1)
-		strcat(b, ((x & z) == z) ? "1" : "0");
+	do strcat(b, ISSET(x, 128 * R - n) ? "1" : "0");
+	while (--n);
 
 	return b;
 }
@@ -315,15 +315,16 @@ uint8_t expand(const agent *a, edge e, const contr n, const contr d, const agent
 	register agent i, j, tot, x = 0, y = 0;
 	register penny nv = 0;
 	__m128i nt[R];
-	agent st[2 * N], cst[N], cars[N] = {0};
+	agent st[2 * N], cst[N], cars[N] = {0}, sts[N] = {0};
 	memcpy(nt, n, sizeof(__m128i) * R);
 	memcpy(cst, csg, sizeof(agent) * N);
 	memcpy(st, sg, sizeof(agent) * 2 * N);
 
 	for (i = 0; i < N; i++)
-		if (!ISSET(nt, i)) cars[i] = (dr[i] > 0);
+		if (!ISSET(nt, i))
+			sts[i] = (cars[i] = (dr[i] > 0)) * (CAR - X(s, i));
 
-	connect(a, e, nt, d, st, cst, cars);
+	connect(a, e, nt, d, st, cst, cars, sts);
 	agentxy oc[N];
 
 	for (i = 0; i < N; i++)
@@ -333,19 +334,17 @@ uint8_t expand(const agent *a, edge e, const contr n, const contr d, const agent
 				y = x;
 				tot = 0;
 				for (j = 0; j < X(st, i); j++) {
-					tot += (oc[x].x = X(s, oc[x].y = cst[Y(st, i) + j]));
-					tot -= dr[oc[x].y];
+					if ((oc[x].x = X(s, oc[x].y = cst[Y(st, i) + j])) == 1 && !dr[oc[x].y]) tot++;
 					x++;
 				}
 				#define gt(a, b) ((*(a)).x > (*(b)).x)
 				QSORT(agentxy, oc + y, x - y, gt);
-				nv += TICKETCOST * (tot > SEATS * cars[i] ? tot - SEATS * cars[i] : 0) + bound(oc + y, x - y, cars[i], l);
+				nv += TICKETCOST * (tot > sts[i] ? tot - sts[i] : 0) + bound(oc + y, x - y, cars[i], l);
 			}
 		}
 
 	if (nv <= opt - MINGAIN) return 1;
 	else return 0;
-	return 1;
 }
 
 void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent *s, agent *cs, agent *dr, meter *l, penny tot, const dist *sp, uint64_t *cnt) {
