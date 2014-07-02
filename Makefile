@@ -3,8 +3,8 @@
 all:
 	gcc -Wall -Ofast -march=native -funroll-loops -fopenmp -ftree-vectorizer-verbose=0 -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 *.c -o rs
 
-use:
-	gcc -Wall -Ofast -march=native -funroll-loops -fopenmp -ftree-vectorizer-verbose=0 -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 -fprofile-use *.c -o rs
+noopt:
+	gcc -Wall -O0 -fopenmp *.c -lm -o rs
 
 profile:
 	gcc -Wall -Ofast -march=native -funroll-loops -fopenmp -ftree-vectorizer-verbose=0 -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 -fprofile-generate *.c -o rs

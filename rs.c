@@ -14,7 +14,7 @@ void printpath(agent *q, agent *s, agent *p) {
 	if (*s == 1 && *q >= N) {
 		*p = *q;
 		printf("r[%zu]=sp[(2*c[0])*2*N+", count++);
-		for (i = 2 * M - 1; i >= 0; i--) {
+		for (i = 2 * SEATS - 1; i >= 0; i--) {
 			printf("(2*c[%u]%s)]+", *(p - i) % N, (*(p - i) < N ? "" : "+1"));
 			printf("sp[(2*c[%u]%s)*2*N+", *(p - i) % N, (*(p - i) < N ? "" : "+1"));
 		}
@@ -134,7 +134,7 @@ meter minpath(agent *c, agent n, agent dr, const dist *sp) {
 		}
 	} while (--dr);
 
-	return ROUND(min);
+	return ROUND(meter, min);
 }
 
 __attribute__((always_inline)) inline
@@ -222,9 +222,8 @@ agent insert(agent c, agent *b, agent bl, agent bu) {
 }
 
 __attribute__((always_inline)) inline
-penny bound(const agentxy *oc, agent n, const agent *dr, const meter *l) {
+penny bound(const agentxy *oc, agent n, agent cars, const meter *l) {
 
-	if (n == 1) return COST(oc[0].y, dr, l);
 	register agent a = 0, b = 0, c, i, bu, bl = 1;
 	register penny bou = 0;
 
@@ -248,15 +247,17 @@ penny bound(const agentxy *oc, agent n, const agent *dr, const meter *l) {
 		if (c > b) b = c;
 	}
 
-	for (i = 0; i < b - a; i++) bou += d[i];
+	//printf("%u %f\n", b, ((float)b - 6/9) * 9/11);
+	if (cars < b) b = cars;
+	if (b > a) for (i = 0; i < b - a; i++) bou += d[i];
 	return bou;
 }
 
 __attribute__((always_inline)) inline
-void connect(const agent *a, edge e, contr n, const contr d, agent *s, agent *cs) {
+void connect(const agent *a, edge e, contr n, const contr d, agent *s, agent *cs, agent *cars) {
 
 	register uint_fast64_t b, i, j, f, r;
-	agent q[N], l[N * N], h[N] = {0}, dr[N] = {1};
+	agent q[N], l[N * N], h[N] = {0}, drt[N] = {0};
 
 	// create an adjacency list for each node, only considering the edges that can still be contracted
 	// iterate over the set of contractible edges and store for every node the list of its adjacent nodes
@@ -285,7 +286,8 @@ void connect(const agent *a, edge e, contr n, const contr d, agent *s, agent *cs
 						q[r++] = b; // continue the search from this node too
 						SET(n, b); // mark "b" as visited
 						// merge the profile of node "b" on the profile of node "i"
-						merge(i, b, n, s, cs, dr);
+						merge(i, b, n, s, cs, drt);
+						cars[i] += cars[b];
 					}
 				}
 				f++;
@@ -310,30 +312,40 @@ const char *byte_to_binary(int x)
 __attribute__((always_inline)) inline
 uint8_t expand(const agent *a, edge e, const contr n, const contr d, const agent *s, const agent *cs, const agent *dr, const meter *l) {
 
-	register agent i, j, x = 0, y = 0;
+	register agent i, j, tot, x = 0, y = 0;
 	register penny nv = 0;
 	__m128i nt[R];
-	agent st[2 * N], cst[N];
+	agent st[2 * N], cst[N], cars[N] = {0};
 	memcpy(nt, n, sizeof(__m128i) * R);
 	memcpy(cst, csg, sizeof(agent) * N);
 	memcpy(st, sg, sizeof(agent) * 2 * N);
-	connect(a, e, nt, d, st, cst);
+
+	for (i = 0; i < N; i++)
+		if (!ISSET(nt, i)) cars[i] = (dr[i] > 0);
+
+	connect(a, e, nt, d, st, cst, cars);
 	agentxy oc[N];
 
 	for (i = 0; i < N; i++)
 		if (!ISSET(nt, i)) {
-			y = x;
-			for (j = 0; j < X(st, i); j++) {
-				oc[x].x = X(s, oc[x].y = cst[Y(st, i) + j]);
-				x++;
+			if (X(st, i) == 1) nv += COST(i, dr, l);
+			else {
+				y = x;
+				tot = 0;
+				for (j = 0; j < X(st, i); j++) {
+					tot += (oc[x].x = X(s, oc[x].y = cst[Y(st, i) + j]));
+					tot -= dr[oc[x].y];
+					x++;
+				}
+				#define gt(a, b) ((*(a)).x > (*(b)).x)
+				QSORT(agentxy, oc + y, x - y, gt);
+				nv += TICKETCOST * (tot > SEATS * cars[i] ? tot - SEATS * cars[i] : 0) + bound(oc + y, x - y, cars[i], l);
 			}
-			#define gt(a, b) ((*(a)).x > (*(b)).x)
-			QSORT(agentxy, oc + y, x - y, gt);
-			nv += bound(oc + y, x - y, dr, l);
 		}
 
 	if (nv <= opt - MINGAIN) return 1;
 	else return 0;
+	return 1;
 }
 
 void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent *s, agent *cs, agent *dr, meter *l, penny tot, const dist *sp, uint64_t *cnt) {
@@ -345,7 +357,7 @@ void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent
 	register agent v1, v2;
 
 	if (tot < opt) {
-		//printcs(s, cs, n, dr, l);
+		puts("NEW MINIMUM");
                 printf("%.2f£\n", POUND(tot));
 		opt = tot;
 	}
