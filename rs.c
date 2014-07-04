@@ -2,6 +2,7 @@
 
 uint64_t count;
 static uint64_t split[E];
+static uint64_t gains[10];
 
 penny opt;
 static agent csg[N];
@@ -171,25 +172,20 @@ void merge(agent v1, agent v2, contr n, agent *s, agent *cs, agent *dr) {
 }
 
 __attribute__((always_inline)) inline
-void contract(edge *g, agent *a, agent v1, agent v2, contr n, contr h, agent *s, agent *cs) {
+void contract(edge *g, agent *a, agent v1, agent v2, contr r, contr n, contr h, agent *s, agent *cs) {
 
-	register uint_fast64_t i, e;
+	register uint_fast64_t i, e, f;
 
 	for (i = 0; i < N; i++)
 		if (!ISSET(n, i) && i != v1 && i != v2) {
 			if ((e = g[i * N + v2])) {
-				register uint_fast64_t t, f;
-				if ((t = g[i * N + v1])) {
-					if (t < e) {
-						f = e;
-						e = t;
-					}
-					else f = t;
+				if ((f = g[i * N + v1])) {
+					if (ISSET(r, f)) SET(r, e);
 					SET(h, f);
 				}
 				g[i * N + v1] = g[v1 * N + i] = e;
-				a[e * 2] = v1;
-				a[e * 2 + 1] = i;
+				X(a, e) = v1;
+				Y(a, e) = i;
 			}
 		}
 }
@@ -229,6 +225,7 @@ penny bound(const agentxy *oc, agent n, agent cars, const meter *l) {
 
 	// sum the value of the coalitions whose size is at least CEIL(CAR / 2)
 	while (oc[a].x >= (1 + ((CAR - 1) / 2)) && a < n) bou += PATHCOST(oc[a++].y, l);
+	return bou;
 
 	// coalitions with size less than CEIL(CAR / 2)
 	penny d[n - a];
@@ -254,37 +251,28 @@ penny bound(const agentxy *oc, agent n, agent cars, const meter *l) {
 }
 
 __attribute__((always_inline)) inline
-void connect(const agent *a, edge e, contr n, const contr d, agent *s, agent *cs, agent *cars, agent *sts) {
+void connect(const agent *a, contr n, const contr c, const contr r, const contr d, agent *s, agent *cs, agent *cars, agent *sts) {
 
-	register uint_fast64_t b, i, j, f, r;
+	register agent b, i, j, f, e;
 	agent q[N], l[N * N], h[N] = {0}, drt[N] = {0};
 
-	// create an adjacency list for each node, only considering the edges that can still be contracted
-	// iterate over the set of contractible edges and store for every node the list of its adjacent nodes
-	for (i = e; i < E + 1; i++)
-		if (!ISSET(d, i)) {
-			r = a[i * 2];
-			f = l[r * N + h[r]++] = a[i * 2 + 1];
-			l[f * N + h[f]++] = r;
+	for (i = 1; i < E + 1; i++)
+		if (!ISSET(c, i) && !ISSET(r, i) && !ISSET(d, i)) {
+			e = a[i * 2];
+			f = l[e * N + h[e]++] = a[i * 2 + 1];
+			l[f * N + h[f]++] = e;
 		}
 
-	/*
-	to compute the upperbound we consider the biggest connected components of the graph 
-	only the edges that can still be contracted are taken into account
-	note that this is automatically done by the construction of the above adjacency list
-	then we loop over the set of nodes and from each of them we do a BFS search, marking all the nodes that can be reached
-	if a node cannot be reached it's in another connected component and we start a new BFS search from that node
-	*/
 	for (i = 0; i < N; i++) {
-		if (!ISSET(n, i)) { // if node "i" has not been visited yet...
-			q[f = 0] = i; // put node "i" in the BFS queue 
-			r = 1;
-			do { // BFS loop
+		if (!ISSET(n, i)) {
+			q[f = 0] = i;
+			e = 1;
+			do {
 				for (j = 0; j < h[q[f]]; j++) {
-					b = l[q[f] * N + j]; //  "b" can be reached from node "i"
-					if (!ISSET(n, b) && i != b) { 
-						q[r++] = b; // continue the search from this node too
-						SET(n, b); // mark "b" as visited
+					b = l[q[f] * N + j];
+					if (!ISSET(n, b) && i != b) {
+						q[e++] = b;
+						SET(n, b);
 						merge(i, b, n, s, cs, drt);
 						cars[i] += cars[b];
 						sts[i] += sts[b];
@@ -292,7 +280,7 @@ void connect(const agent *a, edge e, contr n, const contr d, agent *s, agent *cs
 				}
 				f++;
 			}
-			while (f != r);
+			while (f != e);
 		}
 	}
 }
@@ -310,7 +298,7 @@ const char *contr2binary(contr x)
 }
 
 __attribute__((always_inline)) inline
-uint8_t expand(const agent *a, edge e, const contr n, const contr d, const agent *s, const agent *cs, const agent *dr, const meter *l) {
+uint8_t expand(const agent *a, const contr n, const contr c, const contr r, const contr d, const agent *s, const agent *cs, const agent *dr, const meter *l) {
 
 	register agent i, j, tot, x = 0, y = 0;
 	register penny nv = 0;
@@ -324,7 +312,7 @@ uint8_t expand(const agent *a, edge e, const contr n, const contr d, const agent
 		if (!ISSET(nt, i))
 			sts[i] = (cars[i] = (dr[i] > 0)) * (CAR - X(s, i));
 
-	connect(a, e, nt, d, st, cst, cars, sts);
+	connect(a, nt, c, r, d, st, cst, cars, sts);
 	agentxy oc[N];
 
 	for (i = 0; i < N; i++)
@@ -334,7 +322,7 @@ uint8_t expand(const agent *a, edge e, const contr n, const contr d, const agent
 				y = x;
 				tot = 0;
 				for (j = 0; j < X(st, i); j++) {
-					if ((oc[x].x = X(s, oc[x].y = cst[Y(st, i) + j])) == 1 && !dr[oc[x].y]) tot++;
+					if (!dr[oc[x].y = cst[Y(st, i) + j]]) tot += (oc[x].x = X(s, oc[x].y));
 					x++;
 				}
 				#define gt(a, b) ((*(a)).x > (*(b)).x)
@@ -343,40 +331,54 @@ uint8_t expand(const agent *a, edge e, const contr n, const contr d, const agent
 			}
 		}
 
+	if (nv < opt) {
+		register penny gain = opt - nv;
+		if (gain <= 10) gains[0]++;
+		else {
+			if (gain <= 100) gains[1]++;
+			else {
+				if (gain <= 1000) gains[2]++;
+				else gains[3]++;
+			}
+		}
+	}
+
 	if (nv <= opt - MINGAIN) return 1;
 	else return 0;
 }
 
-void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr d, agent *s, agent *cs, agent *dr, meter *l, penny tot, const dist *sp, uint64_t *cnt) {
+void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr r, contr d, agent *s, agent *cs, agent *dr, meter *l, penny tot, const dist *sp, uint64_t *cnt) {
 
 	count++;
 	if (cnt) (*cnt)++;
-	__m128i h[R];
+	__m128i h[R], rt[R];
 	register edge f, j;
 	register agent v1, v2;
 
 	if (tot < opt) {
-		puts("NEW MINIMUM");
-                printf("%.2f£\n", POUND(tot));
+	        printf("NEW MINIMUM %.2f£\n", POUND(tot));
 		opt = tot;
 	}
 
-	for (f = e + 1; f < E + 1; f++)
-		if (!ISSET(d, f) && X(s, v1 = a[f * 2]) + X(s, v2 = a[f * 2 + 1]) <= CAR && dr[v1] + dr[v2] && expand(a, f, n, d, s, cs, dr, l)) {
+	for (f = 1; f < E + 1; f++)
+		if (!ISSET(c, f) && !ISSET(r, f) && !ISSET(d, f) && X(s, v1 = X(a, f)) + X(s, v2 = Y(a, f)) <= CAR && dr[v1] + dr[v2] && expand(a, n, c, r, d, s, cs, dr, l)) {
 			memcpy(g + N * N, g, sizeof(edge) * N * N);
 			memcpy(a + 2 * (E + 1), a, sizeof(agent) * 2 * (E + 1));
 			memcpy(s + 2 * N, s, sizeof(agent) * 2 * N);
 			memcpy(cs + N, cs, sizeof(agent) * N);
 			memcpy(dr + N, dr, sizeof(agent) * N);
 			memcpy(l + N, l, sizeof(meter) * N);
+			memcpy(rt, r, sizeof(__m128i) * R);
 			for (j = 0; j < R; j++) h[j] = _mm_setzero_si128();
 			merge(v1, v2, n, s + 2 * N, cs + N, dr + N);
-			contract(g + N * N, a + 2 * (E + 1), v1, v2, n, h, s + 2 * N, cs + N);
+			contract(g + N * N, a + 2 * (E + 1), v1, v2, rt, n, h, s + 2 * N, cs + N);
 			l[N + v1] = minpath(cs + N + Y(s + 2 * N, v1), X(s + 2 * N, v1), dr[N + v1], sp);
 			SET(n, v2);
 			SET(c, f);
 			OR(d, h);
-			edgecontraction(g + N * N, a + 2 * (E + 1), f, n, c, d, s + 2 * N, cs + N, dr + N, l + N, tot + COST(v1, dr + N, l + N) - COST(v1, dr, l) - COST(v2, dr, l), sp, cnt ? cnt : split + f - 1);
+			edgecontraction(g + N * N, a + 2 * (E + 1), f, n, c, rt, d, s + 2 * N, cs + N, dr + N, l + N, \
+			tot + COST(v1, dr + N, l + N) - COST(v1, dr, l) - COST(v2, dr, l), sp, cnt ? cnt : split + f - 1);
+			SET(r, f);
 			CLEAR(n, v2);
 			CLEAR(c, f);
 			ANDNOT(d, h);
@@ -514,6 +516,107 @@ inline void createedge(edge *g, agent *a, agent v1, agent v2, edge e) {
 	g[v1 * N + v2] = g[v2 * N + v1] = e;
 	a[e * 2] = v1;
 	a[e * 2 + 1] = v2;
+}
+
+__attribute__((always_inline)) inline
+void driversbfs(const agent *a, const agent *dr, edge *gr, agent *ar) {
+
+	register uint_fast64_t b, i, j, f, r;
+	agent q[N], l[N * N], h[N] = {0};
+
+	__m128i n[R], c[R];;
+	for (i = 0; i < R; i++)
+		c[i] = n[i] = _mm_setzero_si128();
+
+	for (i = 1; i < E + 1; i++) {
+		r = a[i * 2];
+		f = l[r * N + h[r]++] = a[i * 2 + 1];
+		l[f * N + h[f]++] = r;
+	}
+
+	f = 0;
+	r = D;
+
+	for (i = 0; i < N; i++) if (dr[i]) {
+		q[f++] = i;
+		SET(n, i);
+	}
+
+	f = 0;
+	i = 1;
+	do {
+		SET(c, q[f]);
+		for (j = 0; j < h[q[f]]; j++) {
+			b = l[q[f] * N + j];
+			if (!ISSET(n, b)) { q[r++] = b; SET(n, b); }
+			if (!ISSET(c, b)) createedge(gr, ar, q[f], b, i++);
+		}
+		f++;
+	}
+	while (f != r);
+}
+
+void splitgraph(const edge *g, const agent *map, const idx_t *part, edge *g1, agent n1, edge *m1, agent *map1,
+		edge *g2, agent n2, edge *m2, agent *map2, edge *go, agent *ao, edge *e) {
+
+	register agent i, j, p, n = n1 + n2, a = 0, b = 0;
+	agent inv[n];
+
+	for (i = 0; i < n; i++) inv[i] = part[i] ? a++ : b++;
+	for (i = 0; i < n; i++) {
+		((p = part[i]) ? map1 : map2)[inv[i]] = map[i];
+		for (j = i + 1; j < n; j++)
+			if (g[i * n + j]) {
+				if (p ^ part[j]) createedge(go, ao, map[i], map[j], (*e)++);
+				else {
+					if (p) {
+						g1[inv[i] * n1 + inv[j]] = g1[inv[j] * n1 + inv[i]] = 1;
+						(*m1)++;
+					} else {
+						g2[inv[i] * n2 + inv[j]] = g2[inv[j] * n2 + inv[i]] = 1;
+						(*m2)++;
+					}
+				}
+			}
+	 }
+}
+
+void graph2csr(const edge *g, agent n, edge m, idx_t *xadj, idx_t *adjncy) {
+
+	xadj[n] = 2 * m;
+	register uint_fast64_t i, j, h = 0, k = 0;
+
+	for (i = 0; i < n; i++) {
+		xadj[h++] = k;
+		for (j = 0; j < n; j++)
+			if (g[i * n + j]) adjncy[k++] = j;
+	}
+}
+
+edge reorderedges(const edge *g, const agent *map, idx_t n, edge m, edge *go, agent *ao, edge *e, \
+		  real_t *tpwgts, real_t *ubvec, idx_t *options) {
+
+	idx_t cutsize, part[n], ncon = 1, nparts = 2;
+	idx_t xadj[n + 1], adjncy[2 * m];
+	graph2csr(g, n, m, xadj, adjncy);
+	ROUTINE(&n, &ncon, xadj, adjncy, NULL, NULL, NULL, &nparts, tpwgts, ubvec, options, &cutsize, part);
+	register agent i, j, n2, n1 = 0;
+	for (i = 0; i < n; i++) if (part[i]) n1++;
+	n2 = n - n1;
+
+	if (n1 && n2) {
+		edge m1 = 0, m2 = 0, g1[n1 * n1], g2[n2 * n2];
+		agent map1[n1], map2[n2];
+		memset(g1, 0, sizeof(edge) * n1 * n1);
+		memset(g2, 0, sizeof(edge) * n2 * n2);
+		splitgraph(g, map, part, g1, n1, &m1, map1, g2, n2, &m2, map2, go, ao, e);
+		if (n1 > 1) reorderedges(g1, map1, n1, m1, go, ao, e, tpwgts, ubvec, options);
+		if (n2 > 1) reorderedges(g2, map2, n2, m2, go, ao, e, tpwgts, ubvec, options);
+	}
+	else for (i = 0; i < n; i++)
+		for (j = i + 1; j < n; j++)
+			if (g[i * n + j]) createedge(go, ao, map[i], map[j], (*e)++);
+	return cutsize;
 }
 
 void createScaleFree(edge *g, agent *a) {
@@ -660,17 +763,34 @@ int main(int argc, char *argv[]) {
 	init(SEED);
 	createScaleFree(g, a);
 
-	__m128i n[R], c[R], d[R];
-	for (i = 0; i < R; i++)
-		n[i] = c[i] = d[i] = _mm_setzero_si128();
+	edge go[N * N] = {0};
+	agent ao[2 * (E + 1)];
+	idx_t options[METIS_NOPTIONS];
+	METIS_SetDefaultOptions(options);
+	options[METIS_OPTION_OBJTYPE] = METIS_OBJTYPE_CUT;
+	options[METIS_OPTION_SEED] = SEED;
+	real_t tpwgts[2] = {0.5, 0.5}, ubvec = TOLERANCE;
+	agent map[N];
+	edge e = 1;
+	for (i = 0; i < N; i++) map[i] = i;
+	reorderedges(g, map, N, E, go, ao, &e, tpwgts, &ubvec, options);
+	//driversbfs(a, dr, go, ao);
+	memcpy(g, go, sizeof(edge) * N * N);
+	memcpy(a, ao, sizeof(agent) * 2 * (E + 1));
 
-	//printcs(s, cs, n, dr, l);
-	edgecontraction(g, a, 0, n, c, d, s, cs, dr, l, opt, sp, NULL);
+	__m128i n[R], c[R], d[R], r[R];
+	for (i = 0; i < R; i++)
+		n[i] = r[i] = c[i] = d[i] = _mm_setzero_si128();
+
+	edgecontraction(g, a, 0, n, c, r, d, s, cs, dr, l, opt, sp, NULL);
 	gettimeofday(&t2, NULL);
 	printf("%zu CSs\n", count);
 
 	for (i = 0; i < E; i++)
 		if (split[i]) printf("%zu CSs (%.2f%%)\n", split[i], (double)split[i] * 100 / (count - 1));
+
+	puts("Gains:");
+	for (i = 0; i < 4; i++) printf("%zu\n", gains[i]);
 
 	printf("Checksum = %u (size = %zu bytes)\n", crc32(sp, sizeof(dist) * 4 * N * N), sizeof(dist) * 4 * N * N);
 	printf("%f seconds\n", (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
