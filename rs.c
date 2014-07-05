@@ -322,7 +322,8 @@ uint8_t expand(const agent *a, const contr n, const contr c, const contr r, cons
 				y = x;
 				tot = 0;
 				for (j = 0; j < X(st, i); j++) {
-					if (!dr[oc[x].y = cst[Y(st, i) + j]]) tot += (oc[x].x = X(s, oc[x].y));
+					oc[x].x = X(s, oc[x].y = cst[Y(st, i) + j]);
+					if (!dr[oc[x].y]) tot += oc[x].x;
 					x++;
 				}
 				#define gt(a, b) ((*(a)).x > (*(b)).x)
