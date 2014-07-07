@@ -37,16 +37,16 @@ void printpath(agent *q, agent *s, agent *p) {
 }
 
 __attribute__((always_inline)) inline
-void minsse(dist *b, agent n) {
+void minsse(meter *b, agent n) {
 
-	register __m128 tmp, min = _mm_set1_ps(FLT_MAX);
-	register dist *buf = b;
+	register __m128i tmp, min = _mm_set1_epi32(UINT_MAX);
+	register meter *buf = b;
 
 	// tmp input until "buf" reaches 16 byte alignment
 	while (((unsigned long)buf) % 16 != 0 && n > 0) {
-		// Load the next float into the tmp buffer
-		tmp = _mm_set1_ps(*buf);
-		min = _mm_min_ps(min, tmp);
+		// Load the next uint into the tmp buffer
+		tmp = _mm_set1_epi32(*buf);
+		min = _mm_min_epu32(min, tmp);
 		buf++;
 		n--;
 	}
@@ -54,34 +54,34 @@ void minsse(dist *b, agent n) {
 	// use 64 byte prefetch for quadruple quads
 	while (n >= 16) {
 		__builtin_prefetch(buf + 64, 0, 0);
-		tmp = _mm_load_ps(buf);
-		min = _mm_min_ps(min, tmp);
+		tmp = _mm_load_si128((__m128i*)buf);
+		min = _mm_min_epu32(min, tmp);
 		buf += 4;
-		tmp = _mm_load_ps(buf);
-		min = _mm_min_ps(min, tmp);
+		tmp = _mm_load_si128((__m128i*)buf);
+		min = _mm_min_epu32(min, tmp);
 		buf += 4;
-		tmp = _mm_load_ps(buf);
-		min = _mm_min_ps(min, tmp);
+		tmp = _mm_load_si128((__m128i*)buf);
+		min = _mm_min_epu32(min, tmp);
 		buf += 4;
-		tmp = _mm_load_ps(buf);
-		min = _mm_min_ps(min, tmp);
+		tmp = _mm_load_si128((__m128i*)buf);
+		min = _mm_min_epu32(min, tmp);
 		buf += 4;
 		n -= 16;
 	}
 
 	// work through aligned buffers
 	while (n >= 4) {
-		tmp = _mm_load_ps(buf);
-		min = _mm_min_ps(min, tmp);
+		tmp = _mm_load_si128((__m128i*)buf);
+		min = _mm_min_epu32(min, tmp);
 		buf += 4;
 		n -= 4;
 	}
 
 	// work through the rest < 4 samples
 	while (n > 0) {
-		// Load the next float into the tmp buffer
-		tmp = _mm_set1_ps(*buf);
-		min = _mm_min_ps(min, tmp);
+		// Load the next uint into the tmp buffer
+		tmp = _mm_set1_epi32(*buf);
+		min = _mm_min_epu32(min, tmp);
 		buf++;
 		n--;
 	}
@@ -89,20 +89,20 @@ void minsse(dist *b, agent n) {
 	// Find min value through shuffle tricks
 
 	tmp = min;
-	tmp = _mm_shuffle_ps(tmp, tmp, _MM_SHUFFLE(2, 3, 0, 1));
-	tmp = _mm_min_ps(tmp, min);
+	tmp = _mm_shuffle_epi32(tmp, _MM_SHUFFLE(2, 3, 0, 1));
+	tmp = _mm_min_epu32(tmp, min);
 	min = tmp;
-	tmp = _mm_shuffle_ps(tmp, tmp, _MM_SHUFFLE(1, 0, 3, 2));
-	tmp = _mm_min_ps(tmp, min);
-	_mm_store_ss(b, tmp);
+	tmp = _mm_shuffle_epi32(tmp, _MM_SHUFFLE(1, 0, 3, 2));
+	tmp = _mm_min_epu32(tmp, min);
+	*b = tmp[0];
 }
 
 __attribute__((always_inline)) inline
-meter minpath(agent *c, agent n, agent dr, const dist *sp) {
+meter minpath(agent *c, agent n, agent dr, const meter *sp) {
 
-	dist r[R5];
+	meter r[R5];
 	register agent t, i = 1;
-	register dist min = FLT_MAX;
+	register meter min = UINT_MAX;
 
 	do {
 		switch (n) {
@@ -135,7 +135,7 @@ meter minpath(agent *c, agent n, agent dr, const dist *sp) {
 		}
 	} while (--dr);
 
-	return ROUND(meter, min);
+	return min;
 }
 
 __attribute__((always_inline)) inline
@@ -190,14 +190,14 @@ void contract(edge *g, agent *a, agent v1, agent v2, contr r, contr n, contr h, 
 		}
 }
 
-void printcs(const agent *s, const agent *cs, const contr n, const agent *dr, const meter *l) {
+void printcs(const agent *s, const agent *cs, const contr n, const agent *dr, const meter *l, const dist *md) {
 
         register agent i, j;
 
         for (i = 0; i < N; i++) if (!ISSET(n, i)) {
                 printf("{ ");
                 for (j = 0; j < X(s, i); j++) printf("%s%u%s%s ", i == cs[Y(s, i) + j] ? "<" : "", cs[Y(s, i) + j], i == cs[Y(s, i) + j] ? ">" : "", j < dr[i] ? "*" : "");
-                printf("} (%um) = %.2f£\n", l[i], POUND(COST(i, dr, l)));
+                printf("} (%um, %.2fm) = %.2f£\n", l[i], md[i], POUND(COST(i, dr, l)));
         }
 }
 
@@ -348,12 +348,13 @@ uint8_t expand(const agent *a, const contr n, const contr c, const contr r, cons
 	else return 0;
 }
 
-void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr r, contr d, agent *s, agent *cs, agent *dr, meter *l, penny tot, const dist *sp, uint64_t *cnt) {
+void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr r, contr d, agent *s, agent *cs, agent *dr, meter *l, meter *b, dist *md, penny tot, const meter *sp, uint64_t *cnt) {
 
 	count++;
 	if (cnt) (*cnt)++;
 	__m128i h[R], rt[R];
 	register edge f, j;
+	register dist dx, dy;
 	register agent v1, v2;
 
 	if (tot < opt) {
@@ -363,26 +364,34 @@ void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr r, contr
 
 	for (f = 1; f < E + 1; f++)
 		if (!ISSET(c, f) && !ISSET(r, f) && !ISSET(d, f) && X(s, v1 = X(a, f)) + X(s, v2 = Y(a, f)) <= CAR && dr[v1] + dr[v2] && expand(a, n, c, r, d, s, cs, dr, l)) {
-			memcpy(g + N * N, g, sizeof(edge) * N * N);
-			memcpy(a + 2 * (E + 1), a, sizeof(agent) * 2 * (E + 1));
-			memcpy(s + 2 * N, s, sizeof(agent) * 2 * N);
-			memcpy(cs + N, cs, sizeof(agent) * N);
-			memcpy(dr + N, dr, sizeof(agent) * N);
-			memcpy(l + N, l, sizeof(meter) * N);
+			memcpy(b + 2 * N, b, sizeof(meter) * 2 * N);
+			memcpy(md + N, md, sizeof(dist) * N);
 			memcpy(rt, r, sizeof(__m128i) * R);
-			for (j = 0; j < R; j++) h[j] = _mm_setzero_si128();
-			merge(v1, v2, n, s + 2 * N, cs + N, dr + N);
-			contract(g + N * N, a + 2 * (E + 1), v1, v2, rt, n, h, s + 2 * N, cs + N);
-			l[N + v1] = minpath(cs + N + Y(s + 2 * N, v1), X(s + 2 * N, v1), dr[N + v1], sp);
-			SET(n, v2);
-			SET(c, f);
-			OR(d, h);
-			edgecontraction(g + N * N, a + 2 * (E + 1), f, n, c, rt, d, s + 2 * N, cs + N, dr + N, l + N, \
-			tot + COST(v1, dr + N, l + N) - COST(v1, dr, l) - COST(v2, dr, l), sp, cnt ? cnt : split + f - 1);
 			SET(r, f);
-			CLEAR(n, v2);
-			CLEAR(c, f);
-			ANDNOT(d, h);
+			X(b + N, v1) = MEAN(X(b, v1), X(b, v2));
+			Y(b + N, v1) = MEAN(Y(b, v1), Y(b, v2));
+			dx = (dist)X(b + N, v1) - X(b, v1);
+			dy = (dist)Y(b + N, v1) - Y(b, v1);
+			if ((md[N + v1] = DIST(dx, dy)) < MAXDIST) {
+				memcpy(g + N * N, g, sizeof(edge) * N * N);
+				memcpy(a + 2 * (E + 1), a, sizeof(agent) * 2 * (E + 1));
+				memcpy(s + 2 * N, s, sizeof(agent) * 2 * N);
+				memcpy(cs + N, cs, sizeof(agent) * N);
+				memcpy(dr + N, dr, sizeof(agent) * N);
+				memcpy(l + N, l, sizeof(meter) * N);
+				for (j = 0; j < R; j++) h[j] = _mm_setzero_si128();
+				merge(v1, v2, n, s + 2 * N, cs + N, dr + N);
+				contract(g + N * N, a + 2 * (E + 1), v1, v2, rt, n, h, s + 2 * N, cs + N);
+				l[N + v1] = minpath(cs + N + Y(s + 2 * N, v1), X(s + 2 * N, v1), dr[N + v1], sp);
+				SET(n, v2);
+				SET(c, f);
+				OR(d, h);
+				edgecontraction(g + N * N, a + 2 * (E + 1), f, n, c, rt, d, s + 2 * N, cs + N, dr + N, l + N, b + 2 * N, md + N, \
+				tot + COST(v1, dr + N, l + N) - COST(v1, dr, l) - COST(v2, dr, l), sp, cnt ? cnt : split + f - 1);
+				CLEAR(n, v2);
+				CLEAR(c, f);
+				ANDNOT(d, h);
+			}
 		}
 }
 
@@ -442,7 +451,7 @@ item dequeue(item *q, point n) {
 	return temp;
 }
 
-dist astar(point start, point dest, point nodes, const id *idx, const point *adj, const dist *d) {
+meter astar(point start, point dest, point nodes, const id *idx, const point *adj, const dist *d) {
 
 	uint8_t *cset = calloc(nodes, sizeof(uint8_t));
 	uint8_t *inoset = calloc(nodes, sizeof(uint8_t));
@@ -464,7 +473,7 @@ dist astar(point start, point dest, point nodes, const id *idx, const point *adj
 			free(cset);
 			free(oset);
 			free(g);
-			return g[cur];
+			return ROUND(meter, g[cur]);
 		}
 		inoset[cur] = 0;
 		q--;
@@ -492,7 +501,7 @@ dist astar(point start, point dest, point nodes, const id *idx, const point *adj
 	free(cset);
 	free(oset);
 	free(g);
-	return -1;
+	return 0;
 }
 
 void shuffle(void *array, size_t n, size_t size) {
@@ -557,7 +566,7 @@ void driversbfs(const agent *a, const agent *dr, edge *gr, agent *ar) {
 	while (f != r);
 }
 
-void splitgraph(const edge *g, const agent *map, const idx_t *part, edge *g1, agent n1, edge *m1, agent *map1,
+/*void splitgraph(const edge *g, const agent *map, const idx_t *part, edge *g1, agent n1, edge *m1, agent *map1,
 		edge *g2, agent n2, edge *m2, agent *map2, edge *go, agent *ao, edge *e) {
 
 	register agent i, j, p, n = n1 + n2, a = 0, b = 0;
@@ -618,7 +627,7 @@ edge reorderedges(const edge *g, const agent *map, idx_t n, edge m, edge *go, ag
 		for (j = i + 1; j < n; j++)
 			if (g[i * n + j]) createedge(go, ao, map[i], map[j], (*e)++);
 	return cutsize;
-}
+}*/
 
 void createScaleFree(edge *g, agent *a) {
 
@@ -686,8 +695,8 @@ int main(int argc, char *argv[]) {
 	f = fopen(XY, "rb");
 	fread(&nodes, sizeof(point), 1, f);
 
-	meter *xy = malloc(sizeof(meter) * 2 * nodes);
-	fread(xy, sizeof(meter), 2 * nodes, f);
+	uint32_t *xy = malloc(sizeof(uint32_t) * 2 * nodes);
+	fread(xy, sizeof(uint32_t), 2 * nodes, f);
 	fclose(f);
 
 	// adjaciency list
@@ -732,7 +741,7 @@ int main(int argc, char *argv[]) {
 			ds[i * nodes + j] = ds[j * nodes + i] = DIST(dx, dy);
 		}
 
-	dist *sp = calloc(4 * N * N, sizeof(dist));
+	meter *sp = calloc(4 * N * N, sizeof(meter));
 	printf("Using %u threads\n", omp_get_max_threads());
 
 	//#pragma omp parallel for schedule(dynamic) private(i, j)
@@ -749,6 +758,9 @@ int main(int argc, char *argv[]) {
 	agent *cs = malloc(sizeof(agent) * N * N);
 	agent *dr = malloc(sizeof(agent) * N * N);
 	meter *l = malloc(sizeof(meter) * N * N);
+	meter *b = malloc(sizeof(meter) * 2 * N * N);
+	dist *md = malloc(sizeof(dist) * N * N);
+	memset(md, 0, sizeof(dist) * N);
 
 	for (i = 0; i < D; i++) dr[i] = 1;
 	memset(dr + D, 0, sizeof(agent) * (N - D));
@@ -759,6 +771,8 @@ int main(int argc, char *argv[]) {
 		Y(sg, i) = Y(s, i) = csg[i] = cs[i] = i;
 		l[i] = sp[4 * i * N + 2 * i + 1];
 		opt += COST(i, dr, l);
+		X(b, i) = MEAN(X(xy, X(stops, i)), X(xy, Y(stops, i)));
+		Y(b, i) = MEAN(Y(xy, X(stops, i)), Y(xy, Y(stops, i)));
 	}
 
 	init(SEED);
@@ -766,7 +780,7 @@ int main(int argc, char *argv[]) {
 
 	edge go[N * N] = {0};
 	agent ao[2 * (E + 1)];
-	idx_t options[METIS_NOPTIONS];
+	/*idx_t options[METIS_NOPTIONS];
 	METIS_SetDefaultOptions(options);
 	options[METIS_OPTION_OBJTYPE] = METIS_OBJTYPE_CUT;
 	options[METIS_OPTION_SEED] = SEED;
@@ -774,8 +788,8 @@ int main(int argc, char *argv[]) {
 	agent map[N];
 	edge e = 1;
 	for (i = 0; i < N; i++) map[i] = i;
-	reorderedges(g, map, N, E, go, ao, &e, tpwgts, &ubvec, options);
-	//driversbfs(a, dr, go, ao);
+	reorderedges(g, map, N, E, go, ao, &e, tpwgts, &ubvec, options);*/
+	driversbfs(a, dr, go, ao);
 	memcpy(g, go, sizeof(edge) * N * N);
 	memcpy(a, ao, sizeof(agent) * 2 * (E + 1));
 
@@ -783,7 +797,7 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < R; i++)
 		n[i] = r[i] = c[i] = d[i] = _mm_setzero_si128();
 
-	edgecontraction(g, a, 0, n, c, r, d, s, cs, dr, l, opt, sp, NULL);
+	edgecontraction(g, a, 0, n, c, r, d, s, cs, dr, l, b, md, opt, sp, NULL);
 	gettimeofday(&t2, NULL);
 	printf("%zu CSs\n", count);
 
@@ -802,6 +816,8 @@ int main(int argc, char *argv[]) {
 	free(cs);
 	free(xy);
 	free(sp);
+	free(md);
+	free(b);
 	free(l);
 	free(g);
 	free(a);

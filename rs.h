@@ -4,8 +4,8 @@
 #include <omp.h>
 #include <math.h>
 #include <stdio.h>
-#include <float.h>
-#include <metis.h>
+#include <limits.h>
+//#include <metis.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -28,17 +28,19 @@
 #define TICKETCOST 300
 #define PENNYPERLITRE 130
 #define METERSPERLITRE 15000
-#define DRIVERPERC 30
+#define DRIVERPERC 10
 #define MINGAIN 1
+#define MAXDIST 10000
 
 #define SEED 897654
-#define N 15
+#define N 50
 #define K 2
 
 #define D (N * DRIVERPERC / 100)
 #define E (K * N - (K * (K + 1)) / 2)
 #define R (1 + (((E > N ? E : N) - 1) / 128))
 
+#define MEAN(x, y) (((x) + (y)) / 2)
 #define ROUND(type, i) ((type)(i))
 #define POUND(i) ((float)(i) / 100)
 #define COST(i, dr, l) ((dr)[(i)] ? PATHCOST(i, l) : TICKETCOST)
