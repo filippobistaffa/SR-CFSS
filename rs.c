@@ -348,14 +348,16 @@ uint8_t expand(const agent *a, const contr n, const contr c, const contr r, cons
 	else return 0;
 }
 
-void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr r, contr d, agent *s, agent *cs, agent *dr, meter *l, meter *b, dist *md, penny tot, const meter *sp, uint64_t *cnt) {
+void edgecontraction(stack *st, edge e, contr n, contr c, contr r, contr d, penny tot, const meter *sp, uint64_t *cnt) {
 
 	count++;
 	if (cnt) (*cnt)++;
 	__m128i h[R], rt[R];
 	register edge f, j;
-	register dist dx, dy;
 	register agent v1, v2;
+	register meter mx, my;
+	register dist dx, dy, nd;
+	stack cur = *st;
 
 	if (tot < opt) {
 	        printf("NEW MINIMUM %.2f£\n", POUND(tot));
@@ -363,31 +365,28 @@ void edgecontraction(edge *g, agent *a, edge e, contr n, contr c, contr r, contr
 	}
 
 	for (f = 1; f < E + 1; f++)
-		if (!ISSET(c, f) && !ISSET(r, f) && !ISSET(d, f) && X(s, v1 = X(a, f)) + X(s, v2 = Y(a, f)) <= CAR && dr[v1] + dr[v2] && expand(a, n, c, r, d, s, cs, dr, l)) {
-			memcpy(b + 2 * N, b, sizeof(meter) * 2 * N);
-			memcpy(md + N, md, sizeof(dist) * N);
-			memcpy(rt, r, sizeof(__m128i) * R);
+		if (!ISSET(c, f) && !ISSET(r, f) && !ISSET(d, f) && X(cur.s, v1 = X(cur.a, f)) + X(cur.s, v2 = Y(cur.a, f)) <= CAR && \
+		    cur.dr[v1] + cur.dr[v2] && expand(cur.a, n, c, r, d, cur.s, cur.cs, cur.dr, cur.l)) {
 			SET(r, f);
-			X(b + N, v1) = MEAN(X(b, v1), X(b, v2));
-			Y(b + N, v1) = MEAN(Y(b, v1), Y(b, v2));
-			dx = (dist)X(b + N, v1) - X(b, v1);
-			dy = (dist)Y(b + N, v1) - Y(b, v1);
-			if ((md[N + v1] = DIST(dx, dy)) < MAXDIST) {
-				memcpy(g + N * N, g, sizeof(edge) * N * N);
-				memcpy(a + 2 * (E + 1), a, sizeof(agent) * 2 * (E + 1));
-				memcpy(s + 2 * N, s, sizeof(agent) * 2 * N);
-				memcpy(cs + N, cs, sizeof(agent) * N);
-				memcpy(dr + N, dr, sizeof(agent) * N);
-				memcpy(l + N, l, sizeof(meter) * N);
+			memcpy(rt, r, sizeof(__m128i) * R);
+			mx = MEAN(X(cur.b, v1), X(cur.b, v2));
+			my = MEAN(Y(cur.b, v1), Y(cur.b, v2));
+			dx = (dist)mx - X(cur.b, v1);
+			dy = (dist)my - Y(cur.b, v1);
+			if ((nd = DIST(dx, dy)) < MAXDIST) {
+				st[1] = cur;
+				st[1].md[v1] = nd;
+				X(st[1].b, v1) = mx;
+				Y(st[1].b, v1) = my;
 				for (j = 0; j < R; j++) h[j] = _mm_setzero_si128();
-				merge(v1, v2, n, s + 2 * N, cs + N, dr + N);
-				contract(g + N * N, a + 2 * (E + 1), v1, v2, rt, n, h, s + 2 * N, cs + N);
-				l[N + v1] = minpath(cs + N + Y(s + 2 * N, v1), X(s + 2 * N, v1), dr[N + v1], sp);
+				merge(v1, v2, n, st[1].s, st[1].cs, st[1].dr);
+				contract(st[1].g, st[1].a, v1, v2, rt, n, h, st[1].s, st[1].cs);
+				st[1].l[v1] = minpath(st[1].cs + Y(st[1].s, v1), X(st[1].s, v1), st[1].dr[v1], sp);
 				SET(n, v2);
 				SET(c, f);
 				OR(d, h);
-				edgecontraction(g + N * N, a + 2 * (E + 1), f, n, c, rt, d, s + 2 * N, cs + N, dr + N, l + N, b + 2 * N, md + N, \
-				tot + COST(v1, dr + N, l + N) - COST(v1, dr, l) - COST(v2, dr, l), sp, cnt ? cnt : split + f - 1);
+				edgecontraction(st + 1, f, n, c, rt, d, tot + COST(v1, st[1].dr, st[1].l) - COST(v1, cur.dr, cur.l) - COST(v2, cur.dr, cur.l), \
+				sp, cnt ? cnt : split + f - 1);
 				CLEAR(n, v2);
 				CLEAR(c, f);
 				ANDNOT(d, h);
@@ -751,32 +750,27 @@ int main(int argc, char *argv[]) {
 
 	free(ds);
 	free(adj);
-	edge *g = malloc(sizeof(edge) * N * N * N);
-	memset(g, 0, sizeof(edge) * N * N);
-	agent *a = malloc(sizeof(agent) * N * 2 * (E + 1));
-	agent *s = malloc(sizeof(agent) * 2 * N * N);
-	agent *cs = malloc(sizeof(agent) * N * N);
-	agent *dr = malloc(sizeof(agent) * N * N);
-	meter *l = malloc(sizeof(meter) * N * N);
-	meter *b = malloc(sizeof(meter) * 2 * N * N);
-	dist *md = malloc(sizeof(dist) * N * N);
-	memset(md, 0, sizeof(dist) * N);
 
-	for (i = 0; i < D; i++) dr[i] = 1;
-	memset(dr + D, 0, sizeof(agent) * (N - D));
-	shuffle(dr, N, sizeof(agent));
+	stack st[N];
+	//stack *st = malloc(sizeof(stack) * N);
+	memset(st[0].g, 0, sizeof(edge) * N * N);
+	memset(st[0].md, 0, sizeof(dist) * N);
+
+	for (i = 0; i < D; i++) st[0].dr[i] = 1;
+	memset(st[0].dr + D, 0, sizeof(agent) * (N - D));
+	shuffle(st[0].dr, N, sizeof(agent));
 
 	for (i = 0; i < N; i++) {
-		X(sg, i) = X(s, i) = 1;
-		Y(sg, i) = Y(s, i) = csg[i] = cs[i] = i;
-		l[i] = sp[4 * i * N + 2 * i + 1];
-		opt += COST(i, dr, l);
-		X(b, i) = MEAN(X(xy, X(stops, i)), X(xy, Y(stops, i)));
-		Y(b, i) = MEAN(Y(xy, X(stops, i)), Y(xy, Y(stops, i)));
+		X(sg, i) = X(st[0].s, i) = 1;
+		Y(sg, i) = Y(st[0].s, i) = csg[i] = st[0].cs[i] = i;
+		st[0].l[i] = sp[4 * i * N + 2 * i + 1];
+		X(st[0].b, i) = MEAN(X(xy, X(stops, i)), X(xy, Y(stops, i)));
+		Y(st[0].b, i) = MEAN(Y(xy, X(stops, i)), Y(xy, Y(stops, i)));
+		opt += COST(i, st[0].dr, st[0].l);
 	}
 
 	init(SEED);
-	createScaleFree(g, a);
+	createScaleFree(st[0].g, st[0].a);
 
 	edge go[N * N] = {0};
 	agent ao[2 * (E + 1)];
@@ -789,15 +783,15 @@ int main(int argc, char *argv[]) {
 	edge e = 1;
 	for (i = 0; i < N; i++) map[i] = i;
 	reorderedges(g, map, N, E, go, ao, &e, tpwgts, &ubvec, options);*/
-	driversbfs(a, dr, go, ao);
-	memcpy(g, go, sizeof(edge) * N * N);
-	memcpy(a, ao, sizeof(agent) * 2 * (E + 1));
+	driversbfs(st[0].a, st[0].dr, go, ao);
+	memcpy(st[0].g, go, sizeof(edge) * N * N);
+	memcpy(st[0].a, ao, sizeof(agent) * 2 * (E + 1));
 
 	__m128i n[R], c[R], d[R], r[R];
 	for (i = 0; i < R; i++)
 		n[i] = r[i] = c[i] = d[i] = _mm_setzero_si128();
 
-	edgecontraction(g, a, 0, n, c, r, d, s, cs, dr, l, b, md, opt, sp, NULL);
+	edgecontraction(st, 0, n, c, r, d, opt, sp, NULL);
 	gettimeofday(&t2, NULL);
 	printf("%zu CSs\n", count);
 
@@ -812,15 +806,9 @@ int main(int argc, char *argv[]) {
 
 	free(stops);
 	free(idx);
-	free(dr);
-	free(cs);
 	free(xy);
 	free(sp);
-	free(md);
-	free(b);
-	free(l);
-	free(g);
-	free(a);
-	free(s);
+	//free(st);
+
 	return 0;
 }
