@@ -37,6 +37,42 @@ void printpath(agent *q, agent *s, agent *p) {
 }
 
 __attribute__((always_inline)) inline
+void memcpyaligned(void* dest, const void* src, const size_t size) {
+
+	asm("mov %0, %%rsi\n\t"
+	    "mov %1, %%rdi\n\t"
+	    "mov %2, %%rbx\n\t"
+	    "shr $7, %%rbx\n\t"
+	    "1:\n\t"
+	    "prefetchnta 128(%%rsi)\n\t"
+	    "prefetchnta 160(%%rsi)\n\t"
+	    "prefetchnta 192(%%rsi)\n\t"
+	    "prefetchnta 224(%%rsi)\n\t"
+	    "movdqa 0(%%rsi), %%xmm0\n\t"
+	    "movdqa 16(%%rsi), %%xmm1\n\t"
+	    "movdqa 32(%%rsi), %%xmm2\n\t"
+	    "movdqa 48(%%rsi), %%xmm3\n\t"
+	    "movdqa 64(%%rsi), %%xmm4\n\t"
+	    "movdqa 80(%%rsi), %%xmm5\n\t"
+	    "movdqa 96(%%rsi), %%xmm6\n\t"
+	    "movdqa 112(%%rsi), %%xmm7\n\t"
+	    "movntdq %%xmm0, 0(%%rdi)\n\t"
+	    "movntdq %%xmm1, 16(%%rdi)\n\t"
+	    "movntdq %%xmm2, 32(%%rdi)\n\t"
+	    "movntdq %%xmm3, 48(%%rdi)\n\t"
+	    "movntdq %%xmm4, 64(%%rdi)\n\t"
+	    "movntdq %%xmm5, 80(%%rdi)\n\t"
+	    "movntdq %%xmm6, 96(%%rdi)\n\t"
+	    "movntdq %%xmm7, 112(%%rdi)\n\t"
+	    "add $128, %%rsi\n\t"
+	    "add $128, %%rdi\n\t"
+	    "dec %%rbx\n\t"
+	    "jnz 1b\n\t" ::
+	    "r"(src), "r"(dest), "r"(size) :
+	    "rsi", "rdi", "rbx", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "memory");
+}
+
+__attribute__((always_inline)) inline
 void minsse(meter *b, agent n) {
 
 	register __m128i tmp, min = _mm_set1_epi32(UINT_MAX);
