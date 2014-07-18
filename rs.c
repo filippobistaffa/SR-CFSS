@@ -419,8 +419,10 @@ void edgecontraction(stack *st, edge e, contr n, contr c, contr r, contr d, penn
 	__m128i h[R], rt[R];
 	register edge f, j;
 	register agent v1, v2;
+	#ifdef MAXDIST
 	register meter mx, my;
 	register dist dx, dy, nd;
+	#endif
 	stack cur = *st;
 
 	if (tot < opt) {
@@ -433,28 +435,31 @@ void edgecontraction(stack *st, edge e, contr n, contr c, contr r, contr d, penn
 		    cur.dr[v1] + cur.dr[v2] && expand(cur.a, n, c, r, d, cur.s, cur.cs, cur.dr, cur.l)) {
 			SET(r, f);
 			memcpy(rt, r, sizeof(__m128i) * R);
+			#ifdef MAXDIST
 			mx = MEAN(X(cur.b, v1), X(cur.b, v2));
 			my = MEAN(Y(cur.b, v1), Y(cur.b, v2));
 			dx = (dist)mx - X(cur.b, v1);
 			dy = (dist)my - Y(cur.b, v1);
-			if ((nd = DIST(dx, dy)) < MAXDIST) {
-				st[1] = cur;
-				st[1].md[v1] = nd;
-				X(st[1].b, v1) = mx;
-				Y(st[1].b, v1) = my;
-				for (j = 0; j < R; j++) h[j] = _mm_setzero_si128();
-				merge(v1, v2, n, st[1].s, st[1].cs, st[1].dr);
-				contract(st[1].g, st[1].a, v1, v2, rt, n, h, st[1].s, st[1].cs);
-				st[1].l[v1] = minpath(st[1].cs + Y(st[1].s, v1), X(st[1].s, v1), st[1].dr[v1], sp);
-				SET(n, v2);
-				SET(c, f);
-				OR(d, h);
-				edgecontraction(st + 1, f, n, c, rt, d, tot + COST(v1, st[1].dr, st[1].l) - COST(v1, cur.dr, cur.l) - COST(v2, cur.dr, cur.l), \
-				sp, cnt ? cnt : split + f - 1);
-				CLEAR(n, v2);
-				CLEAR(c, f);
-				ANDNOT(d, h);
-			}
+			if ((nd = DIST(dx, dy)) > MAXDIST) continue;
+			#endif
+			st[1] = cur;
+			#ifdef MAXDIST
+			st[1].md[v1] = nd;
+			X(st[1].b, v1) = mx;
+			Y(st[1].b, v1) = my;
+			#endif
+			for (j = 0; j < R; j++) h[j] = _mm_setzero_si128();
+			merge(v1, v2, n, st[1].s, st[1].cs, st[1].dr);
+			contract(st[1].g, st[1].a, v1, v2, rt, n, h, st[1].s, st[1].cs);
+			st[1].l[v1] = minpath(st[1].cs + Y(st[1].s, v1), X(st[1].s, v1), st[1].dr[v1], sp);
+			SET(n, v2);
+			SET(c, f);
+			OR(d, h);
+			edgecontraction(st + 1, f, n, c, rt, d, tot + COST(v1, st[1].dr, st[1].l) - COST(v1, cur.dr, cur.l) - COST(v2, cur.dr, cur.l), \
+			sp, cnt ? cnt : split + f - 1);
+			CLEAR(n, v2);
+			CLEAR(c, f);
+			ANDNOT(d, h);
 		}
 }
 
