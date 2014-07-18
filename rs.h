@@ -30,10 +30,9 @@
 #define METERSPERLITRE 15000
 #define DRIVERPERC 10
 #define MINGAIN 1
-#define MAXDIST 5000
 
 #define SEED 123456
-#define N 45
+#define N 33
 #define K 2
 
 #define D (N * DRIVERPERC / 100)
@@ -72,12 +71,15 @@ typedef float dist;
 typedef struct { point p; dist f; } item;
 typedef struct { agent x; agent y; } agentxy;
 
-typedef struct __attribute__((aligned(16))) {
+typedef struct __attribute__((aligned(128))) {
 	edge g[N * N];
 	agent a[2 * (E + 1)];
 	agent s[2 * N], cs[N], dr[N];
-	meter l[N], b[2 * N];
+	meter l[N];
+	#ifdef MAXDIST
+	meter b[2 * N];
 	dist md[N];
+	#endif
 } stack;
 
 #include "crc32.h"
