@@ -237,6 +237,35 @@ void printcs(const agent *s, const agent *cs, const contr n, const agent *dr, co
         }
 }
 
+void printcsordered(const agent *s, const agent *cs, const contr n) {
+
+        register agent i, j, k = 0;
+	agent cst[N];
+	memcpy(cst, cs, sizeof(agent) * N);
+	typedef struct { agent a; uint32_t x; } coal;
+	coal ct[N];
+
+	for (i = 0; i < N; i++) if (!ISSET(n, i)) {
+		ct[k].a = i;
+		ct[k].x = 0;
+		#define lt(a, b) (*(a) < *(b))
+		QSORT(agent, cst + Y(s, i), j = X(s, i), lt);
+		do ct[k].x = (ct[k].x * N) + cst[Y(s, i) + j - 1];
+		while (--j);
+		k++;
+	}
+
+	#define ltx(a, b) ((*(a)).x < (*(b)).x)
+	QSORT(coal, ct, k, ltx);
+
+	for (i = 0; i < k; i++) {
+		printf("{ ");
+		for (j = 0; j < X(s, ct[i].a); j++) printf("%u ", cst[Y(s, ct[i].a) + j]);
+		printf("} ");
+	}
+	puts("");
+}
+
 __attribute__((always_inline)) inline
 agent insert(agent c, agent *b, agent bl, agent bu) {
 
@@ -267,7 +296,6 @@ penny bound(const agentxy *oc, agent n, agent cars, const meter *l) {
 	penny d[n - a];
 	for (i = 0; i < n - a; i++) d[i] = PATHCOST(oc[a + i].y, l);
 
-	#define lt(a, b) (*(a) < *(b))
 	QSORT(penny, d, n - a, lt);
 
 	while (bl < n) bl *= 2;
