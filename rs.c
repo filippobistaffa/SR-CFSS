@@ -823,7 +823,9 @@ int main(int argc, char *argv[]) {
 	stack st[N];
 	//stack *st = malloc(sizeof(stack) * N);
 	memset(st[0].g, 0, sizeof(edge) * N * N);
+	#ifdef MAXDIST
 	memset(st[0].md, 0, sizeof(dist) * N);
+	#endif
 
 	for (i = 0; i < D; i++) st[0].dr[i] = 1;
 	memset(st[0].dr + D, 0, sizeof(agent) * (N - D));
@@ -833,9 +835,11 @@ int main(int argc, char *argv[]) {
 		X(sg, i) = X(st[0].s, i) = 1;
 		Y(sg, i) = Y(st[0].s, i) = csg[i] = st[0].cs[i] = i;
 		st[0].l[i] = sp[4 * i * N + 2 * i + 1];
+		opt += COST(i, st[0].dr, st[0].l);
+		#ifdef MAXDIST
 		X(st[0].b, i) = MEAN(X(xy, X(stops, i)), X(xy, Y(stops, i)));
 		Y(st[0].b, i) = MEAN(Y(xy, X(stops, i)), Y(xy, Y(stops, i)));
-		opt += COST(i, st[0].dr, st[0].l);
+		#endif
 	}
 
 	init(SEED);
