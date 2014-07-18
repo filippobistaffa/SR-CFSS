@@ -175,7 +175,21 @@ meter minpath(agent *c, agent n, agent dr, const meter *sp) {
 }
 
 __attribute__((always_inline)) inline
-void merge(agent v1, agent v2, contr n, agent *s, agent *cs, agent *dr) {
+agent removeagent(agent *n, agent v2) {
+
+	register agent t = n[n[N] + N];
+
+	if (t != v2) {
+		n[t] = n[v2];
+		n[n[v2]] = t;
+		n[v2] = n[N] + N;
+	}
+
+	return --n[N];
+}
+
+__attribute__((always_inline)) inline
+void merge(agent v1, agent v2, agent *n, agent *s, agent *cs, agent *dr) {
 
 	register agent a, b, da, db, i, min = v1, max = v2;
 
@@ -200,60 +214,65 @@ void merge(agent v1, agent v2, contr n, agent *s, agent *cs, agent *dr) {
 	memcpy(cs + min + da, c, sizeof(agent) * db);
 	memcpy(cs + min + a + db, c + db, sizeof(agent) * (b - db));
 
-	for (i = 0; i < N; i++)
-		if (!ISSET(n, i) && i != v1 && i != v2) {
-			a = Y(s, i);
-                	if (a > min && a < max) Y(s, i) = a + b;
-                }
+	da = removeagent(n, v2);
+	register agent *p = n + N + 1;
+
+	do if ((i = *(p++)) != v1) {
+		a = Y(s, i);
+		if (a > min && a < max) Y(s, i) = a + b;
+	} while (--da);
 }
 
 __attribute__((always_inline)) inline
-void contract(edge *g, agent *a, agent v1, agent v2, contr r, contr n, contr h, agent *s, agent *cs) {
+void contract(edge *g, agent *a, const agent *n, agent v1, agent v2, contr r, contr h) {
 
-	register uint_fast64_t i, e, f;
+	register agent i, e, f, m = n[N];
+	register const agent *p = n + N + 1;
 
-	for (i = 0; i < N; i++)
-		if (!ISSET(n, i) && i != v1 && i != v2) {
-			if ((e = g[i * N + v2])) {
-				if ((f = g[i * N + v1])) {
-					if (ISSET(r, f)) SET(r, e);
-					SET(h, f);
-				}
-				g[i * N + v1] = g[v1 * N + i] = e;
-				X(a, e) = v1;
-				Y(a, e) = i;
+	do if ((i = *(p++)) != v1)
+		if ((e = g[i * N + v2])) {
+			if ((f = g[i * N + v1])) {
+				if (ISSET(r, f)) SET(r, e);
+				SET(h, f);
 			}
+			g[i * N + v1] = g[v1 * N + i] = e;
+			X(a, e) = v1;
+			Y(a, e) = i;
 		}
+	while (--m);
 }
 
-void printcs(const agent *s, const agent *cs, const contr n, const agent *dr, const meter *l, const dist *md) {
+void printcs(const agent *s, const agent *cs, const agent *n, const agent *dr, const meter *l, const dist *md) {
 
-        register agent i, j;
+	register const agent *p = n + N + 1;
+        register agent i, j, m = n[N];
 
-        for (i = 0; i < N; i++) if (!ISSET(n, i)) {
+	do {
+		i = *(p++);
                 printf("{ ");
                 for (j = 0; j < X(s, i); j++) printf("%s%u%s%s ", i == cs[Y(s, i) + j] ? "<" : "", cs[Y(s, i) + j], i == cs[Y(s, i) + j] ? ">" : "", j < dr[i] ? "*" : "");
                 printf("} (%um, %.2fm) = %.2f£\n", l[i], md[i], POUND(COST(i, dr, l)));
-        }
+        } while (--m);
 }
 
-void printcsordered(const agent *s, const agent *cs, const contr n) {
+void printcsordered(const agent *s, const agent *cs, const agent *n) {
 
-        register agent i, j, k = 0;
+        register agent i, j, k = 0, m = n[N];
+	register const agent *p = n + N + 1;
 	agent cst[N];
 	memcpy(cst, cs, sizeof(agent) * N);
 	typedef struct { agent a; uint32_t x; } coal;
 	coal ct[N];
 
-	for (i = 0; i < N; i++) if (!ISSET(n, i)) {
-		ct[k].a = i;
+	do {
+		ct[k].a = i = *(p++);
 		ct[k].x = 0;
 		#define lt(a, b) (*(a) < *(b))
 		QSORT(agent, cst + Y(s, i), j = X(s, i), lt);
 		do ct[k].x = (ct[k].x * N) + cst[Y(s, i) + j - 1];
 		while (--j);
 		k++;
-	}
+	} while (--m);
 
 	#define ltx(a, b) ((*(a)).x < (*(b)).x)
 	QSORT(coal, ct, k, ltx);
@@ -272,6 +291,7 @@ agent insert(agent c, agent *b, agent bl, agent bu) {
 	register agent i = 1, j, ht = CAR - c;
 	while (i < bl) if (b[i *= 2] > ht) i++;
 	b[ht = i] += c;
+
 	for (i /= 2; i >= 1; i /= 2) {
 		j = 2 * i;
 		if (b[j + 1] < b[j]) j++;
@@ -315,9 +335,10 @@ penny bound(const agentxy *oc, agent n, agent cars, const meter *l) {
 }
 
 __attribute__((always_inline)) inline
-void connect(const agent *a, contr n, const contr c, const contr r, const contr d, agent *s, agent *cs, agent *cars, agent *sts) {
+void connect(const agent *a, agent *n, const contr c, const contr r, const contr d, agent *s, agent *cs, agent *cars, agent *sts) {
 
-	register agent b, i, j, f, e;
+	register const agent *p = n + N + 1;
+	register agent b, i, j, f, e, m = n[N];
 	agent q[N], l[N * N], h[N] = {0}, drt[N] = {0};
 
 	for (i = 1; i < E + 1; i++)
@@ -327,26 +348,24 @@ void connect(const agent *a, contr n, const contr c, const contr r, const contr 
 			l[f * N + h[f]++] = e;
 		}
 
-	for (i = 0; i < N; i++) {
-		if (!ISSET(n, i)) {
-			q[f = 0] = i;
-			e = 1;
-			do {
-				for (j = 0; j < h[q[f]]; j++) {
-					b = l[q[f] * N + j];
-					if (!ISSET(n, b) && i != b) {
-						q[e++] = b;
-						SET(n, b);
-						merge(i, b, n, s, cs, drt);
-						cars[i] += cars[b];
-						sts[i] += sts[b];
-					}
+	do {
+		q[f = 0] = i = *(p++);
+		e = 1;
+		do {
+			for (j = 0; j < h[q[f]]; j++) {
+				b = l[q[f] * N + j];
+				if (i != b && CONTAINS(n, b)) {
+					q[e++] = b;
+					merge(i, b, n, s, cs, drt);
+					m--;
+					cars[i] += cars[b];
+					sts[i] += sts[b];
 				}
-				f++;
 			}
-			while (f != e);
+			f++;
 		}
-	}
+		while (f != e);
+	} while (--m);
 }
 
 const char *contr2binary(contr x)
@@ -362,39 +381,45 @@ const char *contr2binary(contr x)
 }
 
 __attribute__((always_inline)) inline
-uint8_t expand(const agent *a, const contr n, const contr c, const contr r, const contr d, const agent *s, const agent *cs, const agent *dr, const meter *l) {
+uint8_t expand(const agent *a, const agent *n, const contr c, const contr r, const contr d, const agent *s, const agent *cs, const agent *dr, const meter *l) {
 
-	register agent i, j, tot, x = 0, y = 0;
+	register agent i, j, tot, x = 0, y = 0, m = n[N];
+	register const agent *p = n + N + 1;
 	register penny nv = 0;
-	__m128i nt[R];
+
+	agent nt[n[N] + N + 1];
 	agent st[2 * N], cst[N], cars[N] = {0}, sts[N] = {0};
-	memcpy(nt, n, sizeof(__m128i) * R);
+
+	memcpy(nt, n, sizeof(agent) * (n[N] + N + 1));
 	memcpy(cst, csg, sizeof(agent) * N);
 	memcpy(st, sg, sizeof(agent) * 2 * N);
 
-	for (i = 0; i < N; i++)
-		if (!ISSET(nt, i))
-			sts[i] = (cars[i] = (dr[i] > 0)) * (CAR - X(s, i));
+	do {
+		i = *(p++);
+		sts[i] = (cars[i] = (dr[i] > 0)) * (CAR - X(s, i));
+	} while (--m);
 
 	connect(a, nt, c, r, d, st, cst, cars, sts);
 	agentxy oc[N];
+	p = nt + N + 1;
+	m = nt[N];
 
-	for (i = 0; i < N; i++)
-		if (!ISSET(nt, i)) {
-			if (X(st, i) == 1) nv += COST(i, dr, l);
-			else {
-				y = x;
-				tot = 0;
-				for (j = 0; j < X(st, i); j++) {
-					oc[x].x = X(s, oc[x].y = cst[Y(st, i) + j]);
-					if (!dr[oc[x].y]) tot += oc[x].x;
-					x++;
-				}
-				#define gt(a, b) ((*(a)).x > (*(b)).x)
-				QSORT(agentxy, oc + y, x - y, gt);
-				nv += TICKETCOST * (tot > sts[i] ? tot - sts[i] : 0) + bound(oc + y, x - y, cars[i], l);
+	do {
+		i = *(p++);
+		if (X(st, i) == 1) nv += COST(i, dr, l);
+		else {
+			y = x;
+			tot = 0;
+			for (j = 0; j < X(st, i); j++) {
+				oc[x].x = X(s, oc[x].y = cst[Y(st, i) + j]);
+				if (!dr[oc[x].y]) tot += oc[x].x;
+				x++;
 			}
+			#define gt(a, b) ((*(a)).x > (*(b)).x)
+			QSORT(agentxy, oc + y, x - y, gt);
+			nv += TICKETCOST * (tot > sts[i] ? tot - sts[i] : 0) + bound(oc + y, x - y, cars[i], l);
 		}
+	} while (--m);
 
 	if (nv < opt) {
 		register penny gain = opt - nv;
@@ -412,7 +437,7 @@ uint8_t expand(const agent *a, const contr n, const contr c, const contr r, cons
 	else return 0;
 }
 
-void edgecontraction(stack *st, edge e, contr n, contr c, contr r, contr d, penny tot, const meter *sp, uint64_t *cnt) {
+void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, const meter *sp, uint64_t *cnt) {
 
 	count++;
 	if (cnt) (*cnt)++;
@@ -432,7 +457,7 @@ void edgecontraction(stack *st, edge e, contr n, contr c, contr r, contr d, penn
 
 	for (f = 1; f < E + 1; f++)
 		if (!ISSET(c, f) && !ISSET(r, f) && !ISSET(d, f) && X(cur.s, v1 = X(cur.a, f)) + X(cur.s, v2 = Y(cur.a, f)) <= CAR && \
-		    cur.dr[v1] + cur.dr[v2] && expand(cur.a, n, c, r, d, cur.s, cur.cs, cur.dr, cur.l)) {
+		    cur.dr[v1] + cur.dr[v2] && expand(cur.a, cur.n, c, r, d, cur.s, cur.cs, cur.dr, cur.l)) {
 			SET(r, f);
 			memcpy(rt, r, sizeof(__m128i) * R);
 			#ifdef MAXDIST
@@ -449,15 +474,13 @@ void edgecontraction(stack *st, edge e, contr n, contr c, contr r, contr d, penn
 			Y(st[1].b, v1) = my;
 			#endif
 			for (j = 0; j < R; j++) h[j] = _mm_setzero_si128();
-			merge(v1, v2, n, st[1].s, st[1].cs, st[1].dr);
-			contract(st[1].g, st[1].a, v1, v2, rt, n, h, st[1].s, st[1].cs);
+			merge(v1, v2, st[1].n, st[1].s, st[1].cs, st[1].dr);
+			contract(st[1].g, st[1].a, st[1].n, v1, v2, rt, h);
 			st[1].l[v1] = minpath(st[1].cs + Y(st[1].s, v1), X(st[1].s, v1), st[1].dr[v1], sp);
-			SET(n, v2);
 			SET(c, f);
 			OR(d, h);
-			edgecontraction(st + 1, f, n, c, rt, d, tot + COST(v1, st[1].dr, st[1].l) - COST(v1, cur.dr, cur.l) - COST(v2, cur.dr, cur.l), \
+			edgecontraction(st + 1, f, c, rt, d, tot + COST(v1, st[1].dr, st[1].l) - COST(v1, cur.dr, cur.l) - COST(v2, cur.dr, cur.l), \
 			sp, cnt ? cnt : split + f - 1);
-			CLEAR(n, v2);
 			CLEAR(c, f);
 			ANDNOT(d, h);
 		}
@@ -830,12 +853,14 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < D; i++) st[0].dr[i] = 1;
 	memset(st[0].dr + D, 0, sizeof(agent) * (N - D));
 	shuffle(st[0].dr, N, sizeof(agent));
+	st[0].n[N] = N;
 
 	for (i = 0; i < N; i++) {
 		X(sg, i) = X(st[0].s, i) = 1;
 		Y(sg, i) = Y(st[0].s, i) = csg[i] = st[0].cs[i] = i;
 		st[0].l[i] = sp[4 * i * N + 2 * i + 1];
 		opt += COST(i, st[0].dr, st[0].l);
+		st[0].n[st[0].n[i] = N + i + 1] = i;
 		#ifdef MAXDIST
 		X(st[0].b, i) = MEAN(X(xy, X(stops, i)), X(xy, Y(stops, i)));
 		Y(st[0].b, i) = MEAN(Y(xy, X(stops, i)), Y(xy, Y(stops, i)));
@@ -860,11 +885,11 @@ int main(int argc, char *argv[]) {
 	memcpy(st[0].g, go, sizeof(edge) * N * N);
 	memcpy(st[0].a, ao, sizeof(agent) * 2 * (E + 1));
 
-	__m128i n[R], c[R], d[R], r[R];
+	__m128i c[R], d[R], r[R];
 	for (i = 0; i < R; i++)
-		n[i] = r[i] = c[i] = d[i] = _mm_setzero_si128();
+		r[i] = c[i] = d[i] = _mm_setzero_si128();
 
-	edgecontraction(st, 0, n, c, r, d, opt, sp, NULL);
+	edgecontraction(st, 0, c, r, d, opt, sp, NULL);
 	gettimeofday(&t2, NULL);
 	printf("%zu CSs\n", count);
 
