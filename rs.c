@@ -175,23 +175,9 @@ meter minpath(agent *c, agent n, agent dr, const meter *sp) {
 }
 
 __attribute__((always_inline)) inline
-agent removeagent(agent *n, agent v2) {
-
-	register agent t = n[n[N] + N];
-
-	if (t != v2) {
-		n[t] = n[v2];
-		n[n[v2]] = t;
-		n[v2] = n[N] + N;
-	}
-
-	return --n[N];
-}
-
-__attribute__((always_inline)) inline
 void merge(agent v1, agent v2, agent *n, agent *s, agent *cs, agent *dr) {
 
-	register agent a, b, da, db, i, min = v1, max = v2;
+	register agent a, b, da, db, i, min = v1, max = v2, *p = n + N + 1;
 
 	if (Y(s, max) < Y(s, min)) {
 		b = max;
@@ -214,8 +200,13 @@ void merge(agent v1, agent v2, agent *n, agent *s, agent *cs, agent *dr) {
 	memcpy(cs + min + da, c, sizeof(agent) * db);
 	memcpy(cs + min + a + db, c + db, sizeof(agent) * (b - db));
 
-	da = removeagent(n, v2);
-	register agent *p = n + N + 1;
+	if ((da = n[n[N] + N]) != v2) {
+		n[da] = n[v2];
+		n[n[v2]] = da;
+		n[v2] = n[N] + N;
+	}
+
+	da = --n[N];
 
 	do if ((i = *(p++)) != v1) {
 		a = Y(s, i);
