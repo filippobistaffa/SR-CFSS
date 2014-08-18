@@ -5,15 +5,11 @@
 #include <math.h>
 #include <stdio.h>
 #include <limits.h>
-//#include <metis.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/time.h>
 #include <immintrin.h>
-
-#define ROUTINE METIS_PartGraphKway
-#define TOLERANCE 1
 
 #define IDX "idx.dat"
 #define ADJ "adj.dat"
@@ -28,12 +24,21 @@
 #define TICKETCOST 300
 #define PENNYPERLITRE 130
 #define METERSPERLITRE 15000
-#define DRIVERPERC 10
+#define DRIVERPERC 20
 #define MINGAIN 1
+#define MAXDRIVERS CAR
 
-#define SEED 123456
-#define N 33
+#define MAXDIST 5500
+#define REORDER
+
+#define SEED 9872124
+#define N 40
 #define K 2
+
+#ifdef METIS
+#define ROUTINE METIS_PartGraphKway
+#define TOLERANCE 1
+#endif
 
 #define D (N * DRIVERPERC / 100)
 #define E (K * N - (K * (K + 1)) / 2)
@@ -48,7 +53,6 @@
 #define X(v, i) ((v)[2 * (i)])
 #define Y(v, i) ((v)[2 * (i) + 1])
 
-#define LASTBIT(x) (_mm_cvtsi128_si64((x)[0]) & 1)
 #define OR(x, y) ({ register uint_fast8_t i; for (i = 0; i < R; i++) x[i] = _mm_or_si128(x[i], y[i]); })
 #define ANDNOT(x, y) ({ register uint_fast8_t i; for (i = 0; i < R; i++) x[i] = _mm_andnot_si128(y[i], x[i]); })
 #define ISSET(x, i) ((_mm_cvtsi128_si64(((i) >> 6) & 1 ? _mm_srli_si128(x[(i) >> 7], 8) : x[(i) >> 7]) >> ((i) & 63)) & 1)
@@ -62,14 +66,14 @@
 
 typedef __m128i *contr;
 typedef uint32_t meter;
-typedef uint16_t point;
+typedef uint16_t place;
 typedef uint16_t agent;
 typedef uint16_t penny;
 typedef uint16_t edge;
 typedef uint32_t id;
 typedef float dist;
 
-typedef struct { point p; dist f; } item;
+typedef struct { place p; dist f; } item;
 typedef struct { agent x; agent y; } agentxy;
 
 typedef struct __attribute__((aligned(128))) {
@@ -77,12 +81,10 @@ typedef struct __attribute__((aligned(128))) {
 	agent a[2 * (E + 1)], n[2 * N + 1];
 	agent s[2 * N], cs[N], dr[N];
 	meter l[N];
-	#ifdef MAXDIST
 	meter b[2 * N];
 	dist md[N];
-	#endif
 } stack;
 
-#include "crc32.h"
+//#include "crc32.h"
 #include "random.h"
 #include "iqsort.h"

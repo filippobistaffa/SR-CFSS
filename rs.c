@@ -2,7 +2,6 @@
 
 uint64_t count;
 static uint64_t split[E];
-static uint64_t gains[10];
 
 penny opt;
 static agent csg[N];
@@ -241,7 +240,8 @@ void printcs(const agent *s, const agent *cs, const agent *n, const agent *dr, c
 	do {
 		i = *(p++);
                 printf("{ ");
-                for (j = 0; j < X(s, i); j++) printf("%s%u%s%s ", i == cs[Y(s, i) + j] ? "<" : "", cs[Y(s, i) + j], i == cs[Y(s, i) + j] ? ">" : "", j < dr[i] ? "*" : "");
+                for (j = 0; j < X(s, i); j++)
+                	printf("%s%u%s%s ", i == cs[Y(s, i) + j] ? "<" : "", cs[Y(s, i) + j], i == cs[Y(s, i) + j] ? ">" : "", j < dr[i] ? "*" : "");
                 printf("} (%um, %.2fm) = %.2f£\n", l[i], md[i], POUND(COST(i, dr, l)));
         } while (--m);
 }
@@ -301,7 +301,6 @@ penny bound(const agentxy *oc, agent n, agent cars, const meter *l) {
 
 	// sum the value of the coalitions whose size is at least CEIL(CAR / 2)
 	while (oc[a].x >= (1 + ((CAR - 1) / 2)) && a < n) bou += PATHCOST(oc[a++].y, l);
-	return bou;
 
 	// coalitions with size less than CEIL(CAR / 2)
 	penny d[n - a];
@@ -319,11 +318,42 @@ penny bound(const agentxy *oc, agent n, agent cars, const meter *l) {
 		if (c > b) b = c;
 	}
 
-	//printf("%u %f\n", b, ((float)b - 6/9) * 9/11);
 	if (cars < b) b = cars;
 	if (b > a) for (i = 0; i < b - a; i++) bou += d[i];
 	return bou;
 }
+
+#ifdef GRAPHVIZ
+
+static char* names[] = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", \
+			 "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "26", "28", "29", "30" };
+
+void graph2png(const agent *a, const agent *n, const contr c, const contr r, const contr d, const char* filename) {
+
+	#include "graphviz/gvc.h"
+	register const agent *p = n + N + 1;
+	register agent i, m = n[N];
+	GVC_t *gvc = gvContext();
+	Agraph_t* g = agopen("test", Agstrictundirected, 0);
+	agsafeset(g, "overlap", "false", "");
+	Agnode_t* nodes[N];
+
+	do { nodes[*p] = agnode(g, names[*p], 1); p++; }
+	while (--m);
+
+	for (i = 1; i < E + 1; i++) if (!ISSET(c, i) && !ISSET(d, i)) {
+		Agedge_t *e = agedge(g, nodes[X(a, i)], nodes[Y(a, i)], "", 1);
+		if (ISSET(r, i)) agsafeset(e, "color", "red", "");
+	}
+
+	gvLayout(gvc, g, "neato");
+	gvRenderFilename(gvc, g, "png", filename);
+	gvFreeLayout(gvc, g);
+	agclose(g);
+	gvFreeContext(gvc);
+}
+
+#endif
 
 __attribute__((always_inline)) inline
 void connect(const agent *a, agent *n, const contr c, const contr r, const contr d, agent *s, agent *cs, agent *cars, agent *sts) {
@@ -334,8 +364,8 @@ void connect(const agent *a, agent *n, const contr c, const contr r, const contr
 
 	for (i = 1; i < E + 1; i++)
 		if (!ISSET(c, i) && !ISSET(r, i) && !ISSET(d, i)) {
-			e = a[i * 2];
-			f = l[e * N + h[e]++] = a[i * 2 + 1];
+			e = X(a, i);
+			f = l[e * N + h[e]++] = Y(a, i);
 			l[f * N + h[f]++] = e;
 		}
 
@@ -371,12 +401,23 @@ const char *contr2binary(contr x)
 	return b;
 }
 
+static const penny thrs[] = { 5, 10, 50, 100, 500, 1000, 5000, 10000, UINT16_MAX };
+static uint64_t gains[sizeof(thrs) / sizeof(penny)];
+
 __attribute__((always_inline)) inline
-uint8_t expand(const agent *a, const agent *n, const contr c, const contr r, const contr d, const agent *s, const agent *cs, const agent *dr, const meter *l) {
+void recordgain(penny gain) { 
+
+	register const penny *i = thrs;
+	while (gain > *i) i++;
+	gains[i - thrs]++;
+}
+
+__attribute__((always_inline)) inline
+uint8_t visit(const agent *a, const agent *n, const contr c, const contr r, const contr d, const agent *s, const agent *cs, const agent *dr, const meter *l) {
 
 	register agent i, j, tot, x = 0, y = 0, m = n[N];
 	register const agent *p = n + N + 1;
-	register penny nv = 0;
+	register penny nv = 0, newbound = 0;
 
 	agent nt[n[N] + N + 1];
 	agent st[2 * N], cst[N], cars[N] = {0}, sts[N] = {0};
@@ -395,43 +436,39 @@ uint8_t expand(const agent *a, const agent *n, const contr c, const contr r, con
 	p = nt + N + 1;
 	m = nt[N];
 
-	do {
-		i = *(p++);
-		if (X(st, i) == 1) nv += COST(i, dr, l);
-		else {
-			y = x;
-			tot = 0;
-			for (j = 0; j < X(st, i); j++) {
-				oc[x].x = X(s, oc[x].y = cst[Y(st, i) + j]);
-				if (!dr[oc[x].y]) tot += oc[x].x;
-				x++;
-			}
-			#define gt(a, b) ((*(a)).x > (*(b)).x)
-			QSORT(agentxy, oc + y, x - y, gt);
-			nv += TICKETCOST * (tot > sts[i] ? tot - sts[i] : 0) + bound(oc + y, x - y, cars[i], l);
+	do if (X(st, i = *(p++)) == 1) { nv += COST(i, dr, l); newbound += COST(i, dr, l); }
+	else {
+		y = x;
+		tot = 0;
+		for (j = 0; j < X(st, i); j++) {
+			oc[x].x = X(s, oc[x].y = cst[Y(st, i) + j]);
+			if (!dr[oc[x].y]) tot += oc[x].x;
+			x++;
 		}
+		#define gt(a, b) ((*(a)).x > (*(b)).x)
+		QSORT(agentxy, oc + y, x - y, gt);
+		nv += TICKETCOST * (tot > sts[i] ? tot - sts[i] : 0) + bound(oc + y, x - y, cars[i], l);
 	} while (--m);
 
-	if (nv < opt) {
-		register penny gain = opt - nv;
-		if (gain <= 10) gains[0]++;
-		else {
-			if (gain <= 100) gains[1]++;
-			else {
-				if (gain <= 1000) gains[2]++;
-				else gains[3]++;
-			}
-		}
-	}
-
-	if (nv <= opt - MINGAIN) return 1;
-	else return 0;
+	if (nv > opt - MINGAIN) return 0;
+	recordgain(opt - nv);
+	return 1;
 }
 
 void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, const meter *sp, uint64_t *cnt) {
 
+	stack cur = *st;
+
 	count++;
 	if (cnt) (*cnt)++;
+
+	if (tot < opt) {
+		printf("NEW MINIMUM %.2f£\n", POUND(tot));
+		opt = tot;
+	}
+
+	if (!visit(cur.a, cur.n, c, r, d, cur.s, cur.cs, cur.dr, cur.l)) return;
+
 	__m128i h[R], rt[R];
 	register edge f, j;
 	register agent v1, v2;
@@ -439,18 +476,13 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 	register meter mx, my;
 	register dist dx, dy, nd;
 	#endif
-	stack cur = *st;
-
-	if (tot < opt) {
-	        printf("NEW MINIMUM %.2f£\n", POUND(tot));
-		opt = tot;
-	}
 
 	for (f = 1; f < E + 1; f++)
-		if (!ISSET(c, f) && !ISSET(r, f) && !ISSET(d, f) && X(cur.s, v1 = X(cur.a, f)) + X(cur.s, v2 = Y(cur.a, f)) <= CAR && \
-		    cur.dr[v1] + cur.dr[v2] && expand(cur.a, cur.n, c, r, d, cur.s, cur.cs, cur.dr, cur.l)) {
-			SET(r, f);
+		if (!ISSET(c, f) && !ISSET(r, f) && !ISSET(d, f)) {
+			if (!(cur.dr[v1 = X(cur.a, f)] + cur.dr[v2 = Y(cur.a, f)])) continue;
 			memcpy(rt, r, sizeof(__m128i) * R);
+			SET(r, f);
+			if (X(cur.s, v1) + X(cur.s, v2) > CAR || cur.dr[v1] + cur.dr[v2] > MAXDRIVERS) continue;
 			#ifdef MAXDIST
 			mx = MEAN(X(cur.b, v1), X(cur.b, v2));
 			my = MEAN(Y(cur.b, v1), Y(cur.b, v2));
@@ -478,9 +510,9 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 }
 
 __attribute__((always_inline)) inline
-void reheapdown(item *q, point root, point bottom) {
+void reheapdown(item *q, place root, place bottom) {
 
-	register point min, right, left = root * 2 + 1;
+	register place min, right, left = root * 2 + 1;
 	register item temp;
 
 	while (left <= bottom) {
@@ -498,9 +530,9 @@ void reheapdown(item *q, point root, point bottom) {
 }
 
 __attribute__((always_inline)) inline
-void reheapup(item *q, point root, point bottom) {
+void reheapup(item *q, place root, place bottom) {
 
-	register point parent;
+	register place parent;
 	register item temp;
 
 	while (bottom > root) {
@@ -516,14 +548,14 @@ void reheapup(item *q, point root, point bottom) {
 }
 
 __attribute__((always_inline)) inline
-void enqueue(item *q, point n, item x) {
+void enqueue(item *q, place n, item x) {
 
 	q[n] = x;
 	reheapup(q, 0, n);
 }
 
 __attribute__((always_inline)) inline
-item dequeue(item *q, point n) {
+item dequeue(item *q, place n) {
 
 	register item temp = q[0];
 	if (n > 1) {
@@ -533,12 +565,12 @@ item dequeue(item *q, point n) {
 	return temp;
 }
 
-meter astar(point start, point dest, point nodes, const id *idx, const point *adj, const dist *d) {
+meter astar(place start, place dest, place nodes, const id *idx, const place *adj, const dist *d) {
 
 	uint8_t *cset = calloc(nodes, sizeof(uint8_t));
 	uint8_t *inoset = calloc(nodes, sizeof(uint8_t));
-	register point cur, deg, nbr, q = 1;
-	const point *nbrs;
+	register place cur, deg, nbr, q = 1;
+	const place *nbrs;
 	register dist t;
 
 	item *oset = malloc(sizeof(item) * nodes);
@@ -606,8 +638,8 @@ void shuffle(void *array, size_t n, size_t size) {
 inline void createedge(edge *g, agent *a, agent v1, agent v2, edge e) {
 
 	g[v1 * N + v2] = g[v2 * N + v1] = e;
-	a[e * 2] = v1;
-	a[e * 2 + 1] = v2;
+	X(a, e) = v1;
+	Y(a, e) = v2;
 }
 
 __attribute__((always_inline)) inline
@@ -621,8 +653,8 @@ void driversbfs(const agent *a, const agent *dr, edge *gr, agent *ar) {
 		c[i] = n[i] = _mm_setzero_si128();
 
 	for (i = 1; i < E + 1; i++) {
-		r = a[i * 2];
-		f = l[r * N + h[r]++] = a[i * 2 + 1];
+		r = X(a, i);
+		f = l[r * N + h[r]++] = Y(a, i);
 		l[f * N + h[f]++] = r;
 	}
 
@@ -648,7 +680,10 @@ void driversbfs(const agent *a, const agent *dr, edge *gr, agent *ar) {
 	while (f != r);
 }
 
-/*void splitgraph(const edge *g, const agent *map, const idx_t *part, edge *g1, agent n1, edge *m1, agent *map1,
+#ifdef METIS
+#include <metis.h>
+
+void splitgraph(const edge *g, const agent *map, const idx_t *part, edge *g1, agent n1, edge *m1, agent *map1,
 		edge *g2, agent n2, edge *m2, agent *map2, edge *go, agent *ao, edge *e) {
 
 	register agent i, j, p, n = n1 + n2, a = 0, b = 0;
@@ -709,7 +744,9 @@ edge reorderedges(const edge *g, const agent *map, idx_t n, edge m, edge *go, ag
 		for (j = i + 1; j < n; j++)
 			if (g[i * n + j]) createedge(go, ao, map[i], map[j], (*e)++);
 	return cutsize;
-}*/
+}
+
+#endif
 
 void createScaleFree(edge *g, agent *a) {
 
@@ -771,11 +808,11 @@ int main(int argc, char *argv[]) {
 	*/
 
 	FILE *f;
-	point nodes, edges;
+	place nodes, edges;
 	agent pool;
 
 	f = fopen(XY, "rb");
-	fread(&nodes, sizeof(point), 1, f);
+	fread(&nodes, sizeof(place), 1, f);
 
 	uint32_t *xy = malloc(sizeof(uint32_t) * 2 * nodes);
 	fread(xy, sizeof(uint32_t), 2 * nodes, f);
@@ -784,9 +821,9 @@ int main(int argc, char *argv[]) {
 	// adjaciency list
 
 	f = fopen(ADJ, "rb");
-	fread(&edges, sizeof(point), 1, f);
-	point *adj = malloc(sizeof(point) * (2 * edges + nodes));
-	fread(adj, sizeof(point), 2 * edges + nodes, f);
+	fread(&edges, sizeof(place), 1, f);
+	place *adj = malloc(sizeof(place) * (2 * edges + nodes));
+	fread(adj, sizeof(place), 2 * edges + nodes, f);
 	fclose(f);
 
 	printf("%u nodes, %u edges\n", nodes, edges);
@@ -804,16 +841,16 @@ int main(int argc, char *argv[]) {
 	fread(&pool, sizeof(agent), 1, f);
 	printf("%u possible agents, choosing %u\n", pool, N);
 
-	point *stops = malloc(sizeof(point) * 2 * pool);
-	fread(stops, sizeof(point), 2 * pool, f);
+	place *stops = malloc(sizeof(place) * 2 * pool);
+	fread(stops, sizeof(place), 2 * pool, f);
 	fclose(f);
 
 	srand(SEED);
-	shuffle(stops, pool, sizeof(point) * 2);
-	stops = realloc(stops, sizeof(point) * 2 * N);
+	shuffle(stops, pool, sizeof(place) * 2);
+	stops = realloc(stops, sizeof(place) * 2 * N);
 	dist *ds = calloc(nodes * nodes, sizeof(dist));
 
-	register point i, j;
+	register place i, j;
 	register dist dx, dy;
 
 	for (i = 0; i < nodes; i++)
@@ -858,12 +895,15 @@ int main(int argc, char *argv[]) {
 		#endif
 	}
 
+	printf("Total cost without ridesharing = %.2f£\n", POUND(opt));
 	init(SEED);
 	createScaleFree(st[0].g, st[0].a);
 
+	#ifdef REORDER
 	edge go[N * N] = {0};
 	agent ao[2 * (E + 1)];
-	/*idx_t options[METIS_NOPTIONS];
+	#ifdef METIS
+	idx_t options[METIS_NOPTIONS];
 	METIS_SetDefaultOptions(options);
 	options[METIS_OPTION_OBJTYPE] = METIS_OBJTYPE_CUT;
 	options[METIS_OPTION_SEED] = SEED;
@@ -871,10 +911,13 @@ int main(int argc, char *argv[]) {
 	agent map[N];
 	edge e = 1;
 	for (i = 0; i < N; i++) map[i] = i;
-	reorderedges(g, map, N, E, go, ao, &e, tpwgts, &ubvec, options);*/
+	reorderedges(st[0].g, map, N, E, go, ao, &e, tpwgts, &ubvec, options);
+	#else
 	driversbfs(st[0].a, st[0].dr, go, ao);
+	#endif
 	memcpy(st[0].g, go, sizeof(edge) * N * N);
 	memcpy(st[0].a, ao, sizeof(agent) * 2 * (E + 1));
+	#endif
 
 	__m128i c[R], d[R], r[R];
 	for (i = 0; i < R; i++)
@@ -882,15 +925,17 @@ int main(int argc, char *argv[]) {
 
 	edgecontraction(st, 0, c, r, d, opt, sp, NULL);
 	gettimeofday(&t2, NULL);
+	printf("Total cost with ridesharing = %.2f£\n", POUND(opt));
 	printf("%zu CSs\n", count);
 
 	for (i = 0; i < E; i++)
 		if (split[i]) printf("%zu CSs (%.2f%%)\n", split[i], (double)split[i] * 100 / (count - 1));
 
 	puts("Gains:");
-	for (i = 0; i < 4; i++) printf("%zu\n", gains[i]);
+	for (i = 0; i < sizeof(thrs) / sizeof(penny); i++) 
+		if (gains[i]) printf("[%06.2f£, %06.2f£] = %zu\n", POUND(!i ? 0 : thrs[i - 1]), POUND(thrs[i]), gains[i]);
 
-	printf("Checksum = %u (size = %zu bytes)\n", crc32(sp, sizeof(dist) * 4 * N * N), sizeof(dist) * 4 * N * N);
+	//printf("Checksum = %u (size = %zu bytes)\n", crc32(sp, sizeof(dist) * 4 * N * N), sizeof(dist) * 4 * N * N);
 	printf("%f seconds\n", (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
 
 	free(stops);
