@@ -81,8 +81,8 @@ typedef struct __attribute__((aligned(128))) {
 	agent a[2 * (E + 1)], n[2 * N + 1];
 	agent s[2 * N], cs[N], dr[N];
 	meter l[N];
-	meter b[2 * N];
-	dist md[N];
+	meter sd[2 * N];
+	//dist md[N];
 } stack;
 
 //#include "crc32.h"

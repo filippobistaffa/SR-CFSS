@@ -232,7 +232,7 @@ void contract(edge *g, agent *a, const agent *n, agent v1, agent v2, contr r, co
 	while (--m);
 }
 
-void printcs(const agent *s, const agent *cs, const agent *n, const agent *dr, const meter *l, const dist *md) {
+void printcs(const agent *s, const agent *cs, const agent *n, const agent *dr, const meter *l) {
 
 	register const agent *p = n + N + 1;
         register agent i, j, m = n[N];
@@ -242,7 +242,7 @@ void printcs(const agent *s, const agent *cs, const agent *n, const agent *dr, c
                 printf("{ ");
                 for (j = 0; j < X(s, i); j++)
                 	printf("%s%u%s%s ", i == cs[Y(s, i) + j] ? "<" : "", cs[Y(s, i) + j], i == cs[Y(s, i) + j] ? ">" : "", j < dr[i] ? "*" : "");
-                printf("} (%um, %.2fm) = %.2f£\n", l[i], md[i], POUND(COST(i, dr, l)));
+                printf("} (%um) = %.2f£\n", l[i], POUND(COST(i, dr, l)));
         } while (--m);
 }
 
@@ -472,10 +472,6 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 	__m128i h[R], rt[R];
 	register edge f, j;
 	register agent v1, v2;
-	#ifdef MAXDIST
-	register meter mx, my;
-	register dist dx, dy, nd;
-	#endif
 
 	for (f = 1; f < E + 1; f++)
 		if (!ISSET(c, f) && !ISSET(r, f) && !ISSET(d, f)) {
@@ -484,17 +480,15 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 			SET(r, f);
 			if (X(cur.s, v1) + X(cur.s, v2) > CAR || cur.dr[v1] + cur.dr[v2] > MAXDRIVERS) continue;
 			#ifdef MAXDIST
-			mx = MEAN(X(cur.b, v1), X(cur.b, v2));
-			my = MEAN(Y(cur.b, v1), Y(cur.b, v2));
-			dx = (dist)mx - X(cur.b, v1);
-			dy = (dist)my - Y(cur.b, v1);
-			if ((nd = DIST(dx, dy)) > MAXDIST) continue;
+			register dist dx, dy;
+			dx = (dist)X(cur.sd, v1) / X(cur.s, v1) - (dist)X(cur.sd, v2) / X(cur.s, v2);
+			dy = (dist)Y(cur.sd, v1) / X(cur.s, v1) - (dist)Y(cur.sd, v2) / X(cur.s, v2);
+			if (DIST(dx, dy) > (cur.dr[v1] && cur.dr[v2] ? CARCOST : TICKETCOST) * METERSPERLITRE / (2 * PENNYPERLITRE)) continue;
 			#endif
 			st[1] = cur;
 			#ifdef MAXDIST
-			st[1].md[v1] = nd;
-			X(st[1].b, v1) = mx;
-			Y(st[1].b, v1) = my;
+			X(st[1].sd, v1) = X(cur.sd, v1) + X(cur.sd, v2);
+			Y(st[1].sd, v1) = Y(cur.sd, v1) + Y(cur.sd, v2);
 			#endif
 			for (j = 0; j < R; j++) h[j] = _mm_setzero_si128();
 			merge(v1, v2, st[1].n, st[1].s, st[1].cs, st[1].dr);
@@ -874,9 +868,9 @@ int main(int argc, char *argv[]) {
 	stack st[N];
 	//stack *st = malloc(sizeof(stack) * N);
 	memset(st[0].g, 0, sizeof(edge) * N * N);
-	#ifdef MAXDIST
-	memset(st[0].md, 0, sizeof(dist) * N);
-	#endif
+	//#ifdef MAXDIST
+	//memset(st[0].md, 0, sizeof(dist) * N);
+	//#endif
 
 	for (i = 0; i < D; i++) st[0].dr[i] = 1;
 	memset(st[0].dr + D, 0, sizeof(agent) * (N - D));
@@ -890,8 +884,8 @@ int main(int argc, char *argv[]) {
 		opt += COST(i, st[0].dr, st[0].l);
 		st[0].n[st[0].n[i] = N + i + 1] = i;
 		#ifdef MAXDIST
-		X(st[0].b, i) = MEAN(X(xy, X(stops, i)), X(xy, Y(stops, i)));
-		Y(st[0].b, i) = MEAN(Y(xy, X(stops, i)), Y(xy, Y(stops, i)));
+		X(st[0].sd, i) = MEAN(X(xy, X(stops, i)), X(xy, Y(stops, i)));
+		Y(st[0].sd, i) = MEAN(Y(xy, X(stops, i)), Y(xy, Y(stops, i)));
 		#endif
 	}
 
