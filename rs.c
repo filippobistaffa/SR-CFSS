@@ -1,9 +1,11 @@
 #include "rs.h"
 
+uint8_t stop;
 uint64_t count;
 static uint64_t split[E];
+struct timeval t1, t2;
 
-penny opt;
+penny opt, bou;
 static agent csg[N];
 static agent sg[2 * N];
 
@@ -294,7 +296,7 @@ agent insert(agent c, agent *b, agent bl, agent bu) {
 }
 
 __attribute__((always_inline)) inline
-penny bound(const agentxy *oc, agent n, agent cars, const meter *l) {
+penny bound(const agentxy *oc, agent n, agent cars, const meter *l, const agent *dr) {
 
 	register agent a = 0, b = 0, c, i, bu, bl = 1;
 	register penny bou = 0;
@@ -304,7 +306,7 @@ penny bound(const agentxy *oc, agent n, agent cars, const meter *l) {
 
 	// coalitions with size less than CEIL(CAR / 2)
 	penny d[n - a];
-	for (i = 0; i < n - a; i++) d[i] = PATHCOST(oc[a + i].y, l);
+	for (i = 0; i < n - a; i++) d[i] = dr[oc[a + i].y] ? PATHCOST(oc[a + i].y, l) : UINT16_MAX;
 
 	QSORT(penny, d, n - a, lt);
 
@@ -417,7 +419,7 @@ uint8_t visit(const agent *a, const agent *n, const contr c, const contr r, cons
 
 	register agent i, j, tot, x = 0, y = 0, m = n[N];
 	register const agent *p = n + N + 1;
-	register penny nv = 0, newbound = 0;
+	register penny nv = 0;
 
 	agent nt[n[N] + N + 1];
 	agent st[2 * N], cst[N], cars[N] = {0}, sts[N] = {0};
@@ -431,12 +433,12 @@ uint8_t visit(const agent *a, const agent *n, const contr c, const contr r, cons
 		sts[i] = (cars[i] = (dr[i] > 0)) * (CAR - X(s, i));
 	} while (--m);
 
-	connect(a, nt, c, r, d, st, cst, cars, sts);
+        connect(a, nt, c, r, d, st, cst, cars, sts);
 	agentxy oc[N];
 	p = nt + N + 1;
 	m = nt[N];
 
-	do if (X(st, i = *(p++)) == 1) { nv += COST(i, dr, l); newbound += COST(i, dr, l); }
+	do if (X(st, i = *(p++)) == 1) nv += COST(i, dr, l);
 	else {
 		y = x;
 		tot = 0;
@@ -447,26 +449,23 @@ uint8_t visit(const agent *a, const agent *n, const contr c, const contr r, cons
 		}
 		#define gt(a, b) ((*(a)).x > (*(b)).x)
 		QSORT(agentxy, oc + y, x - y, gt);
-		nv += TICKETCOST * (tot > sts[i] ? tot - sts[i] : 0) + bound(oc + y, x - y, cars[i], l);
+		nv += TICKETCOST * (tot > sts[i] ? tot - sts[i] : 0) + bound(oc + y, x - y, cars[i], l, dr);
 	} while (--m);
 
+	if (stop) { if (nv < bou) bou = nv; return 0; }
 	if (nv > opt - MINGAIN) return 0;
-	recordgain(opt - nv);
 	return 1;
 }
 
 void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, const meter *sp, uint64_t *cnt) {
 
+	
+	gettimeofday(&t2, NULL);
+	if ((double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec > LIMIT) stop = 1;
 	stack cur = *st;
-
 	count++;
 	if (cnt) (*cnt)++;
-
-	if (tot < opt) {
-		printf("NEW MINIMUM %.2f£\n", POUND(tot));
-		opt = tot;
-	}
-
+	if (tot < opt) bou = opt = tot;
 	if (!visit(cur.a, cur.n, c, r, d, cur.s, cur.cs, cur.dr, cur.l)) return;
 
 	__m128i h[R], rt[R];
@@ -781,7 +780,6 @@ void createScaleFree(edge *g, agent *a) {
 
 int main(int argc, char *argv[]) {
 
-	struct timeval t1, t2;
 	gettimeofday(&t1, NULL);
 
 	/*
@@ -820,8 +818,6 @@ int main(int argc, char *argv[]) {
 	fread(adj, sizeof(place), 2 * edges + nodes, f);
 	fclose(f);
 
-	printf("%u nodes, %u edges\n", nodes, edges);
-
 	// adjaciency indexes
 
 	f = fopen(IDX, "rb");
@@ -833,7 +829,6 @@ int main(int argc, char *argv[]) {
 
 	f = fopen(SS, "rb");
 	fread(&pool, sizeof(agent), 1, f);
-	printf("%u possible agents, choosing %u\n", pool, N);
 
 	place *stops = malloc(sizeof(place) * 2 * pool);
 	fread(stops, sizeof(place), 2 * pool, f);
@@ -855,7 +850,6 @@ int main(int argc, char *argv[]) {
 		}
 
 	meter *sp = calloc(4 * N * N, sizeof(meter));
-	printf("Using %u threads\n", omp_get_max_threads());
 
 	//#pragma omp parallel for schedule(dynamic) private(i, j)
 	for (i = 0; i < 2 * N; i++)
@@ -889,7 +883,7 @@ int main(int argc, char *argv[]) {
 		#endif
 	}
 
-	printf("Total cost without ridesharing = %.2f£\n", POUND(opt));
+	penny in = opt;
 	init(SEED);
 	createScaleFree(st[0].g, st[0].a);
 
@@ -918,19 +912,7 @@ int main(int argc, char *argv[]) {
 		r[i] = c[i] = d[i] = _mm_setzero_si128();
 
 	edgecontraction(st, 0, c, r, d, opt, sp, NULL);
-	gettimeofday(&t2, NULL);
-	printf("Total cost with ridesharing = %.2f£\n", POUND(opt));
-	printf("%zu CSs\n", count);
-
-	for (i = 0; i < E; i++)
-		if (split[i]) printf("%zu CSs (%.2f%%)\n", split[i], (double)split[i] * 100 / (count - 1));
-
-	puts("Gains:");
-	for (i = 0; i < sizeof(thrs) / sizeof(penny); i++) 
-		if (gains[i]) printf("[%06.2f£, %06.2f£] = %zu\n", POUND(!i ? 0 : thrs[i - 1]), POUND(thrs[i]), gains[i]);
-
-	//printf("Checksum = %u (size = %zu bytes)\n", crc32(sp, sizeof(dist) * 4 * N * N), sizeof(dist) * 4 * N * N);
-	printf("%f seconds\n", (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
+	printf("%u,%u,%llu,%u,%u,%u,%u\n", N, D, SEED, LIMIT, in, opt, bou);
 
 	free(stops);
 	free(idx);

@@ -26,13 +26,14 @@
 #define METERSPERLITRE 15000
 #define DRIVERPERC 20
 #define MINGAIN 1
-#define MAXDRIVERS CAR
+#define MAXDRIVERS 1
+#define LIMIT 100
 
-#define MAXDIST 5500
+#define MAXDIST
 #define REORDER
 
-#define SEED 9872124
-#define N 40
+#define SEED 9872124ULL
+#define N 100
 #define K 2
 
 #ifdef METIS
