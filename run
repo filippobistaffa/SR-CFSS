@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 
 /tmp/$1-$2-$4 >> $3
-rm tmp/$1-$2-$4
+rm /tmp/$1-$2-$4
