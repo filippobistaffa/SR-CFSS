@@ -15,4 +15,4 @@ do
 done
 
 echo $seeds | xargs -n 1 --max-procs=$(( $cores / 2 )) ./compilemd $1 $2 $3
-echo $seeds | xargs -n 1 --max-procs=$cores ./runmd $1 $2 $3 $5/$1-$2-$3-md
+echo $seeds | xargs -n 1 --max-procs=$cores ./runmd $1 $2 $3 $5/$1-$2-$3-md.csv
