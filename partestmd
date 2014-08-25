@@ -5,7 +5,7 @@ seeds=""
 
 for t in `seq 1 $3`
 do
-	seeds="$args$RANDOM$RANDOM "
+	seeds="$seeds$RANDOM$RANDOM "
 done
 
 echo $seeds | xargs -n 1 --max-procs=$cores ./runmd $1 $2 $4/$1-$2-md
