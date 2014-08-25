@@ -849,7 +849,7 @@ int main(int argc, char *argv[]) {
 	meter *sp = calloc(4 * N * N, sizeof(meter));
 	//printf("Using %u threads\n", omp_get_max_threads());
 
-	//#pragma omp parallel for schedule(dynamic) private(i, j)
+	#pragma omp parallel for schedule(dynamic) private(i, j)
 	for (i = 0; i < 2 * N; i++)
 		for (j = i + 1; j < 2 * N; j++)
 			sp[i * 2 * N + j] = sp[j * 2 * N + i] = astar(stops[i], stops[j], nodes, idx, adj, ds);
