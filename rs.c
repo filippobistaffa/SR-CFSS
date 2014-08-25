@@ -881,8 +881,7 @@ int main(int argc, char *argv[]) {
 		#endif
 	}
 
-	//printf("Total cost without ridesharing = %.2f£\n", POUND(opt));
-	printf("%u,%u,%d,%u,", N, D, SEED, opt);
+	penny in = opt;
 	init(SEED);
 	createScaleFree(st[0].g, st[0].a);
 
@@ -914,7 +913,7 @@ int main(int argc, char *argv[]) {
 	size_t maxc = split[0];
 
 	for (i = 1; i < E; i++) maxc = split[i] > maxc ? split[i] : maxc;
-	printf("%u,%zu,%zu\n", opt, count, maxc);
+	printf("%u,%u,%d,%u,%u,%zu,%zu\n", N, D, SEED, in, opt, count, maxc);
 
 	/*
 	printf("Total cost with ridesharing = %.2f£\n", POUND(opt));
