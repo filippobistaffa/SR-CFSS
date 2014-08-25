@@ -2,7 +2,7 @@
 
 if [ "$#" -eq 0 ]
 then
-	echo "usage: ./partestmd N D MAXLIMIT NTESTS OUTDIR"
+	echo "usage: ./partestmd N D MINGAIN NTESTS OUTDIR"
 	exit
 fi
 
@@ -15,4 +15,4 @@ do
 done
 
 echo $seeds | xargs -n 1 --max-procs=$(( $cores / 2 )) ./compilemd $1 $2 $3
-echo $seeds | xargs -n 1 --max-procs=$cores ./runmd $1 $2 $3 $5/$1-$2-md
+echo $seeds | xargs -n 1 --max-procs=$cores ./runmd $1 $2 $3 $5/$1-$2-$3-md

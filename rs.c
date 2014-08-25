@@ -913,7 +913,7 @@ int main(int argc, char *argv[]) {
 	size_t maxc = split[0];
 
 	for (i = 1; i < E; i++) maxc = split[i] > maxc ? split[i] : maxc;
-	printf("%u,%u,%llu,%u,%u,%zu,%zu\n", N, D, SEED, in, opt, count, maxc);
+	printf("%u,%u,%u,%llu,%u,%u,%zu,%zu\n", N, D, MINGAIN, SEED, in, opt, count, maxc);
 
 	/*
 	printf("Total cost with ridesharing = %.2f£\n", POUND(opt));
