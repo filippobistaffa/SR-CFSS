@@ -306,7 +306,7 @@ penny bound(const agentxy *oc, agent n, agent cars, const meter *l, const agent 
 
 	// coalitions with size less than CEIL(CAR / 2)
 	penny d[n - a];
-	for (i = 0; i < n - a; i++) d[i] = dr[oc[a + i].y] ? PATHCOST(oc[a + i].y, l) : UINT16_MAX;
+	for (i = 0; i < n - a; i++) d[i] = dr[oc[a + i].y] ? PATHCOST(oc[a + i].y, l) : UINT32_MAX;
 
 	QSORT(penny, d, n - a, lt);
 
@@ -403,17 +403,6 @@ const char *contr2binary(contr x)
 	return b;
 }
 
-static const penny thrs[] = { 5, 10, 50, 100, 500, 1000, 5000, 10000, UINT16_MAX };
-static uint64_t gains[sizeof(thrs) / sizeof(penny)];
-
-__attribute__((always_inline)) inline
-void recordgain(penny gain) { 
-
-	register const penny *i = thrs;
-	while (gain > *i) i++;
-	gains[i - thrs]++;
-}
-
 __attribute__((always_inline)) inline
 uint8_t visit(const agent *a, const agent *n, const contr c, const contr r, const contr d, const agent *s, const agent *cs, const agent *dr, const meter *l) {
 
@@ -459,7 +448,6 @@ uint8_t visit(const agent *a, const agent *n, const contr c, const contr r, cons
 
 void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, const meter *sp, uint64_t *cnt) {
 
-	
 	gettimeofday(&t2, NULL);
 	if ((double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec > LIMIT) stop = 1;
 	stack cur = *st;
