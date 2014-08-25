@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 
 gcc -Wall -Ofast -march=native -funroll-loops -fopenmp -ftree-vectorizer-verbose=0 -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 \
--DN=$1 -DDRIVERPERC=$2 -DSEED=$3ULL *.c -o /tmp/$1-$2-$3
+-DN=$1 -DDRIVERPERC=$2 -DMINGAIN=$3 -DSEED=$4ULL *.c -o /tmp/$1-$2-$3-$4

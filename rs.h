@@ -25,7 +25,7 @@
 #define PENNYPERLITRE 130
 #define METERSPERLITRE 15000
 //#define DRIVERPERC 20
-#define MINGAIN 1
+//#define MINGAIN 1
 #define MAXDRIVERS 1
 
 //#define MAXDIST
