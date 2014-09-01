@@ -500,8 +500,8 @@ penny subbound2(const agent *p, agent m, const agent *s, const agent *cs, const 
 }
 
 __attribute__((always_inline)) inline
-uint8_t visit(const agent *a, const agent *n, const contr c, const contr r, const contr d, \
-	      const agent *s, const agent *cs, const agent *dr, const meter *l, const meter *sp) {
+penny bound(const agent *a, const agent *n, const contr c, const contr r, const contr d, \
+	    const agent *s, const agent *cs, const agent *dr, const meter *l, const meter *sp) {
 
 	register agent i, m = n[N];
 	register const agent *p = n + N + 1;
@@ -531,7 +531,7 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 	stack cur = *st;
 	if (cnt) (*cnt)++;
 	if (tot < opt) opt = tot;
-	if (visit(cur.a, cur.n, c, r, d, cur.s, cur.cs, cur.dr, cur.l, sp) >= opt - MINGAIN) return;
+	if (bound(cur.a, cur.n, c, r, d, cur.s, cur.cs, cur.dr, cur.l, sp) >= opt - MINGAIN) return;
 
 	__m128i h[R], rt[R];
 	register edge f, j;
