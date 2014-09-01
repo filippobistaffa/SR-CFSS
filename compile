@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
 
+tmp=`mktemp`
+basename="net/twitter-2010"
+wg="wg"
+
+java -Xmx4000m -cp .:$wg/* ReduceGraph $basename $1 $4 > $tmp
 gcc -Wall -Ofast -march=native -funroll-loops -fopenmp -ftree-vectorizer-verbose=0 -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 \
--DN=$1 -DDRIVERPERC=$2 -DLIMIT=$3 -DSEED=$4ULL *.c -o /tmp/$1-$2-$3-$4
+-DDRIVERPERC=$2 -DLIMIT=$3 -DSEED=$4ULL -include types.h -include $tmp *.c -o /tmp/$1-$2-$3-$4
+rm $tmp

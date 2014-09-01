@@ -6,10 +6,8 @@
 #include <stdio.h>
 #include <limits.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <string.h>
 #include <sys/time.h>
-#include <immintrin.h>
 
 #define IDX "idx.dat"
 #define ADJ "adj.dat"
@@ -42,7 +40,7 @@
 #endif
 
 #define D (N * DRIVERPERC / 100)
-#define E (K * N - (K * (K + 1)) / 2)
+//#define E (K * N - (K * (K + 1)) / 2)
 #define R (1 + (((E > N ? E : N) - 1) / 128))
 
 #define MEAN(x, y) (((x) + (y)) / 2)
@@ -64,15 +62,6 @@
 
 #define CLEAR(x, i) ({ x[(i) >> 7] = _mm_andnot_si128(_mm_set_epi64x((((i) >> 6) & 1) ? 1ULL << ((i) & 63) : 0, \
                        (((i) >> 6) & 1) ? 0 : 1ULL << ((i) & 63)), x[(i) >> 7]); })
-
-typedef __m128i *contr;
-typedef uint32_t meter;
-typedef uint16_t place;
-typedef uint16_t agent;
-typedef uint32_t penny;
-typedef uint16_t edge;
-typedef uint32_t id;
-typedef float dist;
 
 typedef struct { place p; dist f; } item;
 typedef struct { agent x; agent y; } agentxy;
