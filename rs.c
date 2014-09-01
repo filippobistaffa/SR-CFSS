@@ -294,17 +294,17 @@ agent insert(agent c, agent *b, agent bl, agent bu) {
 }
 
 __attribute__((always_inline)) inline
-penny bound(const agentxy *oc, agent n, agent cars, const meter *l, const agent *dr) {
+penny subbound22(const agentxy *oc, agent n, agent cars, const meter *l, const agent *dr) {
 
 	register agent a = 0, b = 0, c, i, bu, bl = 1;
 	register penny bou = 0;
 
 	// sum the value of the coalitions whose size is at least CEIL(CAR / 2)
-	while (oc[a].x >= (1 + ((CAR - 1) / 2)) && a < n) bou += PATHCOST(oc[a++].y, l);
+	while (oc[a].x >= (1 + ((CAR - 1) / 2)) && a < n) bou += PATHCOST(l[oc[a++].y]) + CARCOST;
 
 	// coalitions with size less than CEIL(CAR / 2)
 	penny d[n - a];
-	for (i = 0; i < n - a; i++) d[i] = dr[oc[a + i].y] ? PATHCOST(oc[a + i].y, l): UINT16_MAX;
+	for (i = 0; i < n - a; i++) d[i] = dr[oc[a + i].y] ? (PATHCOST(l[oc[a + i].y]) + CARCOST) : UINT16_MAX;
 
 	QSORT(penny, d, n - a, lt);
 
@@ -405,7 +405,7 @@ static const penny thrs[] = { 5, 10, 50, 100, 500, 1000, 5000, 10000, UINT16_MAX
 static uint64_t gains[sizeof(thrs) / sizeof(penny)];
 
 __attribute__((always_inline)) inline
-void recordgain(penny gain) { 
+void recordgain(penny gain) {
 
 	register const penny *i = thrs;
 	while (gain > *i) i++;
@@ -413,28 +413,74 @@ void recordgain(penny gain) {
 }
 
 __attribute__((always_inline)) inline
-uint8_t visit(const agent *a, const agent *n, const contr c, const contr r, const contr d, const agent *s, const agent *cs, const agent *dr, const meter *l) {
+penny subbound1(const agent *p, agent m, const agent *s, const agent *cs, const agent *st, \
+		const agent *cst, const agent *dr, const agent *cars, const meter *l, const meter *sp) {
 
-	register agent i, j, tot, x = 0, y = 0, m = n[N];
-	register const agent *p = n + N + 1;
+	register agent i, j, k;
 	register penny nv = 0;
+	agentpath mp[N];
+	meter et[2 * N];
 
-	agent nt[n[N] + N + 1];
-	agent st[2 * N], cst[N], cars[N] = {0}, sts[N] = {0};
+	do if (X(st, i = *(p++)) == 1) nv += COST(i, dr, l);
+	else {
+		register agent nc, cy, tr = 0, ccx = X(st, i); // number of coalitions in the current component
 
-	memcpy(nt, n, sizeof(agent) * (n[N] + N + 1));
-	memcpy(cst, csg, sizeof(agent) * N);
-	memcpy(st, sg, sizeof(agent) * 2 * N);
+		for (j = 0; j < ccx; j++)
+			for (k = 0; k < X(s, cy = cst[Y(st, i) + j]); k++) {
+				mp[tr].a = cs[Y(s, cy) + k];
+				mp[tr].d = dr[cy];
+				mp[tr].p = 0;
+				tr++;
+			}
 
-	do {
-		i = *(p++);
-		sts[i] = (cars[i] = (dr[i] > 0)) * (CAR - X(s, i));
+		if (cars[i]) {
+			for (j = 0; j < tr; j++) {
+				for (k = 0; k < tr; k++) {
+					X(et, k) = sp[2 * mp[j].a * 2 * N + 2 * mp[k].a];
+					Y(et, k) = sp[2 * mp[j].a * 2 * N + 2 * mp[k].a + 1];
+				}
+				QSORT(meter, et, 2 * tr, lt);
+				mp[j].p += et[0] + (dr[mp[j].a] ? 0 : et[1]);
+				for (k = 0; k < tr; k++) {
+					X(et, k) = sp[(2 * mp[j].a + 1) * 2 * N + 2 * mp[k].a];
+					Y(et, k) = sp[(2 * mp[j].a + 1) * 2 * N + 2 * mp[k].a + 1];
+				}
+				QSORT(meter, et, 2 * tr, lt);
+				mp[j].p += et[0] + (dr[mp[j].a] ? 0 : et[1]);
+				mp[j].p /= 2;
+			}
+
+			#define ltmp(a, b) ( ((*(a)).d != (*(b)).d) ? ((*(a)).d > (*(b)).d) : ((*(a)).p < (*(b)).p) )
+			QSORT(agentpath, mp, tr, ltmp);
+			register penny minc = UINT16_MAX, curc;
+
+			for (nc = 1; nc <= cars[i]; nc++) {
+				register agent as = nc * CAR; // available seats;
+				curc = nc * CARCOST; // minimum cost given this number of cars
+				curc += tr > as ? (tr - as) * TICKETCOST : 0;
+				register penny pc;
+
+				for (j = 0; j < (tr < as ? tr : as); j++) {
+					pc = PATHCOST(mp[j].p);
+					curc += (pc > TICKETCOST) ? TICKETCOST : pc;
+				}
+				if (curc < minc) minc = curc;
+			}
+			nv += minc;
+		}
+		else nv += tr * TICKETCOST;
 	} while (--m);
 
-	connect(a, nt, c, r, d, st, cst, cars, sts);
+	return nv;
+}
+
+__attribute__((always_inline)) inline
+penny subbound2(const agent *p, agent m, const agent *s, const agent *cs, const agent *st, \
+		const agent *cst, const agent *dr, const agent *cars, const meter *l, const agent *sts) {
+
+	register agent i, j, tot, x = 0, y = 0;
+	register penny nv = 0;
 	agentxy oc[N];
-	p = nt + N + 1;
-	m = nt[N];
 
 	do if (X(st, i = *(p++)) == 1) nv += COST(i, dr, l);
 	else {
@@ -447,12 +493,36 @@ uint8_t visit(const agent *a, const agent *n, const contr c, const contr r, cons
 		}
 		#define gt(a, b) ((*(a)).x > (*(b)).x)
 		QSORT(agentxy, oc + y, x - y, gt);
-		nv += TICKETCOST * (tot > sts[i] ? tot - sts[i] : 0) + bound(oc + y, x - y, cars[i], l, dr);
+		nv += TICKETCOST * (tot > sts[i] ? tot - sts[i] : 0) + subbound22(oc + y, x - y, cars[i], l, dr);
 	} while (--m);
 
-	if (nv > opt - MINGAIN) return 0;
-	//recordgain(opt - nv);
-	return 1;
+	return nv;
+}
+
+__attribute__((always_inline)) inline
+uint8_t visit(const agent *a, const agent *n, const contr c, const contr r, const contr d, \
+	      const agent *s, const agent *cs, const agent *dr, const meter *l, const meter *sp) {
+
+	register agent i, m = n[N];
+	register const agent *p = n + N + 1;
+
+	agent nt[n[N] + N + 1];
+	agent st[2 * N], cst[N], cars[N] = {0}, sts[N] = {0};
+	memcpy(nt, n, sizeof(agent) * (n[N] + N + 1));
+	memcpy(cst, csg, sizeof(agent) * N);
+	memcpy(st, sg, sizeof(agent) * 2 * N);
+
+	do {
+		i = *(p++);
+		sts[i] = (cars[i] = (dr[i] > 0)) * (CAR - X(s, i));
+	} while (--m);
+
+	connect(a, nt, c, r, d, st, cst, cars, sts);
+	p = nt + N + 1;
+	m = nt[N];
+	register penny b1 = subbound1(p, m, s, cs, st, cst, dr, cars, l, sp);
+	register penny b2 = subbound2(p, m, s, cs, st, cst, dr, cars, l, sts);
+	return b1 > b2 ? b1 : b2;
 }
 
 void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, const meter *sp, uint64_t *cnt) {
@@ -461,7 +531,7 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 	stack cur = *st;
 	if (cnt) (*cnt)++;
 	if (tot < opt) opt = tot;
-	if (!visit(cur.a, cur.n, c, r, d, cur.s, cur.cs, cur.dr, cur.l)) return;
+	if (visit(cur.a, cur.n, c, r, d, cur.s, cur.cs, cur.dr, cur.l, sp) >= opt - MINGAIN) return;
 
 	__m128i h[R], rt[R];
 	register edge f, j;
@@ -850,9 +920,11 @@ int main(int argc, char *argv[]) {
 	//printf("Using %u threads\n", omp_get_max_threads());
 
 	//#pragma omp parallel for schedule(dynamic) private(i, j)
-	for (i = 0; i < 2 * N; i++)
+	for (i = 0; i < 2 * N; i++) {
+		sp[i * 2 * N + i] = UINT32_MAX;
 		for (j = i + 1; j < 2 * N; j++)
 			sp[i * 2 * N + j] = sp[j * 2 * N + i] = astar(stops[i], stops[j], nodes, idx, adj, ds);
+	}
 
 	free(ds);
 	free(adj);
