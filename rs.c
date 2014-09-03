@@ -890,12 +890,12 @@ int main(int argc, char *argv[]) {
 	f = fopen(SS, "rb");
 	fread(&pool, sizeof(agent), 1, f);
 
-	place *stops = malloc(sizeof(place) * 2 * pool);
-	fread(stops, sizeof(place), 2 * pool, f);
+	place *stops = malloc(sizeof(place) * pool);
+	fread(stops, sizeof(place), pool, f);
 	fclose(f);
 
 	srand(SEED);
-	shuffle(stops, pool, sizeof(place) * 2);
+	shuffle(stops, pool, sizeof(place));
 	stops = realloc(stops, sizeof(place) * 2 * N);
 	dist *ds = calloc(nodes * nodes, sizeof(dist));
 
