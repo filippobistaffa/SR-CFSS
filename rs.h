@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include "types.h"
 
 #define IDX "idx.dat"
 #define ADJ "adj.dat"
@@ -27,7 +28,6 @@
 #define MAXDRIVERS 1
 //#define LIMIT 100
 
-#define MAXDIST
 #define REORDER
 
 //#define SEED 9872124ULL
@@ -73,7 +73,6 @@ typedef struct __attribute__((aligned(128))) {
 	agent s[2 * N], cs[N], dr[N];
 	meter l[N];
 	meter sd[2 * N];
-	//dist md[N];
 } stack;
 
 //#include "crc32.h"
