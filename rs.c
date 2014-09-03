@@ -276,53 +276,6 @@ void printcsordered(const agent *s, const agent *cs, const agent *n) {
 	puts("");
 }
 
-__attribute__((always_inline)) inline
-agent insert(agent c, agent *b, agent bl, agent bu) {
-
-	register agent i = 1, j, ht = CAR - c;
-	while (i < bl) if (b[i *= 2] > ht) i++;
-	b[ht = i] += c;
-
-	for (i /= 2; i >= 1; i /= 2) {
-		j = 2 * i;
-		if (b[j + 1] < b[j]) j++;
-		if (b[i] == b[j]) break;
-		b[i] = b[j];
-	}
-
-	return 1 + ht - bl;
-}
-
-__attribute__((always_inline)) inline
-penny subbound22(const agentxy *oc, agent n, agent cars, const meter *l, const agent *dr) {
-
-	register agent a = 0, b = 0, c, i, bu, bl = 1;
-	register penny bou = 0;
-
-	// sum the value of the coalitions whose size is at least CEIL(CAR / 2)
-	while (oc[a].x >= (1 + ((CAR - 1) / 2)) && a < n) bou += PATHCOST(l[oc[a++].y]) + CARCOST;
-
-	// coalitions with size less than CEIL(CAR / 2)
-	penny d[n - a];
-	for (i = 0; i < n - a; i++) d[i] = dr[oc[a + i].y] ? (PATHCOST(l[oc[a + i].y]) + CARCOST) : UINT16_MAX;
-
-	QSORT(penny, d, n - a, lt);
-
-	while (bl < n) bl *= 2;
-	bu = 2 * bl;
-	agent bins[bu];
-	memset(bins, 0, sizeof(agent) * bu);
-
-	for (i = 0; i < n; i++) {
-		c = insert(oc[i].x, bins, bl, bu);
-		if (c > b) b = c;
-	}
-
-	if (cars < b) b = cars;
-	if (b > a) for (i = 0; i < b - a; i++) bou += d[i];
-	return bou;
-}
-
 #ifdef GRAPHVIZ
 
 static char* names[] = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", \
@@ -356,7 +309,7 @@ void graph2png(const agent *a, const agent *n, const contr c, const contr r, con
 #endif
 
 __attribute__((always_inline)) inline
-void connect(const agent *a, agent *n, const contr c, const contr r, const contr d, agent *s, agent *cs, agent *cars, agent *sts) {
+void connect(const agent *a, agent *n, const contr c, const contr r, const contr d, agent *s, agent *cs, agent *cars) {
 
 	register const agent *p = n + N + 1;
 	register agent b, i, j, f, e, m = n[N];
@@ -380,7 +333,6 @@ void connect(const agent *a, agent *n, const contr c, const contr r, const contr
 					merge(i, b, n, s, cs, drt);
 					m--;
 					cars[i] += cars[b];
-					sts[i] += sts[b];
 				}
 			}
 			f++;
@@ -413,25 +365,48 @@ void recordgain(penny gain) {
 }
 
 __attribute__((always_inline)) inline
-penny subbound1(const agent *p, agent m, const agent *s, const agent *cs, const agent *st, \
-		const agent *cst, const agent *dr, const agent *cars, const meter *l, const meter *sp) {
+penny bound(const agent *a, const agent *n, const contr c, const contr r, const contr d, \
+	    const agent *s, const agent *cs, const agent *dr, const meter *l, const meter *sp) {
 
-	register agent i, j, k;
-	register penny nv = 0;
+	register agent i, j, k, m = n[N];
+	register const agent *p = n + N + 1;
+	register penny b = 0;
+
+	agent nt[m + N + 1];
+	agent st[2 * N], cst[N], cars[N] = {0};
 	agentpath mp[N];
 	meter et[2 * N];
 
-	do if (X(st, i = *(p++)) == 1) nv += COST(i, dr, l);
+	memcpy(nt, n, sizeof(agent) * (n[N] + N + 1));
+	memcpy(cst, csg, sizeof(agent) * N);
+	memcpy(st, sg, sizeof(agent) * 2 * N);
+
+	do {
+		i = *(p++);
+		cars[i] = (dr[i] > 0);
+	} while (--m);
+
+	connect(a, nt, c, r, d, st, cst, cars);
+	p = nt + N + 1;
+	m = nt[N];
+
+	do if (X(st, i = *(p++)) == 1) b += COST(i, dr, l);
 	else {
-		register agent nc, cy, tr = 0, ccx = X(st, i); // number of coalitions in the current component
+		register agent as, cy, ck, tr = 0, ccx = X(st, i);
+		register penny pc, b1 = 0, b2 = 0;
 
 		for (j = 0; j < ccx; j++)
 			for (k = 0; k < X(s, cy = cst[Y(st, i) + j]); k++) {
-				mp[tr].a = cs[Y(s, cy) + k];
+				ck = cs[Y(s, cy) + k];
+				if (dr[ck]) b1 += PATHCOST(l[ck]);
+				mp[tr].a = ck;
 				mp[tr].d = dr[cy];
 				mp[tr].p = 0;
 				tr++;
 			}
+
+		as = cars[i] * CAR;
+		b += cars[i] * CARCOST + ((tr > as) ? (tr - as) * TICKETCOST : 0);
 
 		if (cars[i]) {
 			for (j = 0; j < tr; j++) {
@@ -452,77 +427,18 @@ penny subbound1(const agent *p, agent m, const agent *s, const agent *cs, const 
 
 			#define ltmp(a, b) ( ((*(a)).d != (*(b)).d) ? ((*(a)).d > (*(b)).d) : ((*(a)).p < (*(b)).p) )
 			QSORT(agentpath, mp, tr, ltmp);
-			register penny minc = UINT16_MAX, curc;
 
-			for (nc = 1; nc <= cars[i]; nc++) {
-				register agent as = nc * CAR; // available seats;
-				curc = nc * CARCOST; // minimum cost given this number of cars
-				curc += tr > as ? (tr - as) * TICKETCOST : 0;
-				register penny pc;
-
-				for (j = 0; j < (tr < as ? tr : as); j++) {
-					pc = PATHCOST(mp[j].p);
-					curc += (pc > TICKETCOST) ? TICKETCOST : pc;
-				}
-				if (curc < minc) minc = curc;
+			for (j = 0; j < (tr < as ? tr : as); j++) {
+				pc = PATHCOST(mp[j].p);
+				b2 += (pc > TICKETCOST) ? TICKETCOST : pc;
 			}
-			nv += minc;
+
+			b += b1 > b2 ? b1 : b2;
 		}
-		else nv += tr * TICKETCOST;
+		else b += tr * TICKETCOST;
 	} while (--m);
 
-	return nv;
-}
-
-__attribute__((always_inline)) inline
-penny subbound2(const agent *p, agent m, const agent *s, const agent *cs, const agent *st, \
-		const agent *cst, const agent *dr, const agent *cars, const meter *l, const agent *sts) {
-
-	register agent i, j, tot, x = 0, y = 0;
-	register penny nv = 0;
-	agentxy oc[N];
-
-	do if (X(st, i = *(p++)) == 1) nv += COST(i, dr, l);
-	else {
-		y = x;
-		tot = 0;
-		for (j = 0; j < X(st, i); j++) {
-			oc[x].x = X(s, oc[x].y = cst[Y(st, i) + j]);
-			if (!dr[oc[x].y]) tot += oc[x].x;
-			x++;
-		}
-		#define gt(a, b) ((*(a)).x > (*(b)).x)
-		QSORT(agentxy, oc + y, x - y, gt);
-		nv += TICKETCOST * (tot > sts[i] ? tot - sts[i] : 0) + subbound22(oc + y, x - y, cars[i], l, dr);
-	} while (--m);
-
-	return nv;
-}
-
-__attribute__((always_inline)) inline
-penny bound(const agent *a, const agent *n, const contr c, const contr r, const contr d, \
-	    const agent *s, const agent *cs, const agent *dr, const meter *l, const meter *sp) {
-
-	register agent i, m = n[N];
-	register const agent *p = n + N + 1;
-
-	agent nt[n[N] + N + 1];
-	agent st[2 * N], cst[N], cars[N] = {0}, sts[N] = {0};
-	memcpy(nt, n, sizeof(agent) * (n[N] + N + 1));
-	memcpy(cst, csg, sizeof(agent) * N);
-	memcpy(st, sg, sizeof(agent) * 2 * N);
-
-	do {
-		i = *(p++);
-		sts[i] = (cars[i] = (dr[i] > 0)) * (CAR - X(s, i));
-	} while (--m);
-
-	connect(a, nt, c, r, d, st, cst, cars, sts);
-	p = nt + N + 1;
-	m = nt[N];
-	register penny b1 = subbound1(p, m, s, cs, st, cst, dr, cars, l, sp);
-	register penny b2 = subbound2(p, m, s, cs, st, cst, dr, cars, l, sts);
-	return b1 > b2 ? b1 : b2;
+	return b;
 }
 
 void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, const meter *sp, uint64_t *cnt) {
@@ -543,18 +459,7 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 			memcpy(rt, r, sizeof(__m128i) * R);
 			SET(r, f);
 			if (X(cur.s, v1) + X(cur.s, v2) > CAR || cur.dr[v1] + cur.dr[v2] > MAXDRIVERS) continue;
-			#ifdef MAXDIST
-			register dist dx, dy;
-			dx = (dist)X(cur.sd, v1) / X(cur.s, v1) - (dist)X(cur.sd, v2) / X(cur.s, v2);
-			dy = (dist)Y(cur.sd, v1) / X(cur.s, v1) - (dist)Y(cur.sd, v2) / X(cur.s, v2);
-			if (DIST(dx, dy) > (cur.dr[v1] && cur.dr[v2] ? CARCOST : TICKETCOST) * METERSPERLITRE / (2 * PENNYPERLITRE)) continue;
-			//if (DIST(dx, dy) > (cur.dr[v1] && cur.dr[v2] ? 1 : 3) * MAXDIST) continue;
-			#endif
 			st[1] = cur;
-			#ifdef MAXDIST
-			X(st[1].sd, v1) = X(cur.sd, v1) + X(cur.sd, v2);
-			Y(st[1].sd, v1) = Y(cur.sd, v1) + Y(cur.sd, v2);
-			#endif
 			for (j = 0; j < R; j++) h[j] = _mm_setzero_si128();
 			merge(v1, v2, st[1].n, st[1].s, st[1].cs, st[1].dr);
 			contract(st[1].g, st[1].a, st[1].n, v1, v2, rt, h);
@@ -932,9 +837,6 @@ int main(int argc, char *argv[]) {
 	stack st[N];
 	//stack *st = malloc(sizeof(stack) * N);
 	memset(st[0].g, 0, sizeof(edge) * N * N);
-	//#ifdef MAXDIST
-	//memset(st[0].md, 0, sizeof(dist) * N);
-	//#endif
 
 	for (i = 0; i < D; i++) st[0].dr[i] = 1;
 	memset(st[0].dr + D, 0, sizeof(agent) * (N - D));
@@ -947,10 +849,6 @@ int main(int argc, char *argv[]) {
 		st[0].l[i] = sp[4 * i * N + 2 * i + 1];
 		opt += COST(i, st[0].dr, st[0].l);
 		st[0].n[st[0].n[i] = N + i + 1] = i;
-		#ifdef MAXDIST
-		X(st[0].sd, i) = MEAN(X(xy, X(stops, i)), X(xy, Y(stops, i)));
-		Y(st[0].sd, i) = MEAN(Y(xy, X(stops, i)), Y(xy, Y(stops, i)));
-		#endif
 	}
 
 	penny in = opt;

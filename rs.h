@@ -26,7 +26,6 @@
 //#define MINGAIN 1
 #define MAXDRIVERS 1
 
-//#define MAXDIST
 #define REORDER
 
 //#define SEED 456
@@ -72,7 +71,6 @@ typedef struct __attribute__((aligned(128))) {
 	agent s[2 * N], cs[N], dr[N];
 	meter l[N];
 	meter sd[2 * N];
-	//dist md[N];
 } stack;
 
 //#include "crc32.h"
