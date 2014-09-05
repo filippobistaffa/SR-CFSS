@@ -8,6 +8,7 @@ struct timeval t1, t2;
 penny opt, bou;
 static agent csg[N];
 static agent sg[2 * N];
+static agentpath mp[N];
 
 void printpath(agent *q, agent *s, agent *p) {
 
@@ -365,8 +366,7 @@ penny bound(const agent *a, const agent *n, const contr c, const contr r, const 
 
 	agent nt[m + N + 1];
 	agent st[2 * N], cst[N], cars[N] = {0};
-	agentpath mp[N];
-	meter et[2 * N];
+	agentpath mpt[N];
 
 	memcpy(nt, n, sizeof(agent) * (n[N] + N + 1));
 	memcpy(cst, csg, sizeof(agent) * N);
@@ -390,9 +390,8 @@ penny bound(const agent *a, const agent *n, const contr c, const contr r, const 
 			for (k = 0; k < X(s, cy = cst[Y(st, i) + j]); k++) {
 				ck = cs[Y(s, cy) + k];
 				if (dr[ck]) b1 += PATHCOST(l[ck]);
-				mp[tr].a = ck;
-				mp[tr].d = dr[cy];
-				mp[tr].p = 0;
+				mpt[tr] = mp[ck];
+				mpt[tr].d = dr[cy];
 				tr++;
 			}
 
@@ -400,27 +399,11 @@ penny bound(const agent *a, const agent *n, const contr c, const contr r, const 
 		b += cars[i] * CARCOST + ((tr > as) ? (tr - as) * TICKETCOST : 0);
 
 		if (cars[i]) {
-			for (j = 0; j < tr; j++) {
-				for (k = 0; k < tr; k++) {
-					X(et, k) = sp[2 * mp[j].a * 2 * N + 2 * mp[k].a];
-					Y(et, k) = sp[2 * mp[j].a * 2 * N + 2 * mp[k].a + 1];
-				}
-				QSORT(meter, et, 2 * tr, lt);
-				mp[j].p += et[0] + (dr[mp[j].a] ? 0 : et[1]);
-				for (k = 0; k < tr; k++) {
-					X(et, k) = sp[(2 * mp[j].a + 1) * 2 * N + 2 * mp[k].a];
-					Y(et, k) = sp[(2 * mp[j].a + 1) * 2 * N + 2 * mp[k].a + 1];
-				}
-				QSORT(meter, et, 2 * tr, lt);
-				mp[j].p += et[0] + (dr[mp[j].a] ? 0 : et[1]);
-				mp[j].p /= 2;
-			}
-
 			#define ltmp(a, b) ( ((*(a)).d != (*(b)).d) ? ((*(a)).d > (*(b)).d) : ((*(a)).p < (*(b)).p) )
-			QSORT(agentpath, mp, tr, ltmp);
+			QSORT(agentpath, mpt, tr, ltmp);
 
 			for (j = 0; j < (tr < as ? tr : as); j++) {
-				pc = PATHCOST(mp[j].p);
+				pc = PATHCOST(mpt[j].p);
 				b2 += (pc > TICKETCOST) ? TICKETCOST : pc;
 			}
 
@@ -833,6 +816,25 @@ int main(int argc, char *argv[]) {
 	memset(st[0].dr + D, 0, sizeof(agent) * (N - D));
 	shuffle(st[0].dr, N, sizeof(agent));
 	st[0].n[N] = N;
+
+	meter et[2 * N];
+	for (i = 0; i < N; i++) mp[i].a = i;
+	
+	for (i = 0; i < N; i++) {
+		for (j = 0; j < N; j++) {
+			X(et, j) = sp[2 * mp[i].a * 2 * N + 2 * mp[j].a];
+			Y(et, j) = sp[2 * mp[i].a * 2 * N + 2 * mp[j].a + 1];
+		}
+		QSORT(meter, et, 2 * N, lt);
+		mp[i].p += et[0] + (st[0].dr[mp[i].a] ? 0 : et[1]);
+		for (j = 0; j < N; j++) {
+			X(et, j) = sp[(2 * mp[i].a + 1) * 2 * N + 2 * mp[j].a];
+			Y(et, j) = sp[(2 * mp[i].a + 1) * 2 * N + 2 * mp[j].a + 1];
+		}
+		QSORT(meter, et, 2 * N, lt);
+		mp[i].p += et[0] + (st[0].dr[mp[i].a] ? 0 : et[1]);
+		mp[i].p /= 2;
+	}
 
 	for (i = 0; i < N; i++) {
 		X(sg, i) = X(st[0].s, i) = 1;
