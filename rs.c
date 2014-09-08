@@ -417,8 +417,8 @@ penny bound(const agent *a, const agent *n, const contr c, const contr r, const 
 
 void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, const meter *sp, uint64_t *cnt) {
 
-	gettimeofday(&t2, NULL);
-	if ((double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec > LIMIT) stop = 1;
+	if (!stop) gettimeofday(&t2, NULL);
+	if (stop || (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec > LIMIT) stop = 1;
 	stack cur = *st;
 	count++;
 	if (cnt) (*cnt)++;
@@ -775,7 +775,7 @@ int main(int argc, char *argv[]) {
 	// start and stop points
 
 	f = fopen(SS, "rb");
-	fread(&pool, sizeof(agent), 1, f);
+	fread(&pool, sizeof(uint16_t), 1, f);
 
 	place *stops = malloc(sizeof(place) * pool);
 	fread(stops, sizeof(place), pool, f);
@@ -798,7 +798,7 @@ int main(int argc, char *argv[]) {
 	stops = realloc(stops, sizeof(place) * 2 * N);
 	meter *sp = calloc(4 * N * N, sizeof(meter));
 
-	//#pragma omp parallel for schedule(dynamic) private(i, j)
+	#pragma omp parallel for schedule(dynamic) private(i, j)
 	for (i = 0; i < 2 * N; i++) {
 		sp[i * 2 * N + i] = UINT32_MAX;
 		for (j = i + 1; j < 2 * N; j++)
@@ -819,7 +819,7 @@ int main(int argc, char *argv[]) {
 
 	meter et[2 * N];
 	for (i = 0; i < N; i++) mp[i].a = i;
-	
+
 	for (i = 0; i < N; i++) {
 		for (j = 0; j < N; j++) {
 			X(et, j) = sp[2 * mp[i].a * 2 * N + 2 * mp[j].a];
