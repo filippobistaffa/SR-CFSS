@@ -1,5 +1,7 @@
 #include "rs.h"
 
+penny in;
+
 __attribute__((always_inline)) inline
 void reheapdown(item *q, place root, place bottom) {
 
@@ -298,24 +300,18 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < D; i++) st.dr[i] = 1;
 	memset(st.dr + D, 0, sizeof(agent) * (N - D));
 	shuffle(st.dr, N, sizeof(agent));
-	st.n[N] = N;
 
 	for (i = 0; i < N; i++) {
 		st.l[i] = sp[4 * i * N + 2 * i + 1];
-		opt += COST(i, st.dr, st.l);
-		st.n[st.n[i] = N + i + 1] = i;
+		in += COST(i, st.dr, st.l);
 	}
 
-	penny in = opt;
 	init(SEED);
 	//memset(st.g, 0, sizeof(edge) * N * N);
 	//createScaleFree(st.g, st.a);
-	memcpy(st[0].g, g, sizeof(edge) * N * N);
-	memcpy(st[0].a, a, sizeof(agent) * 2 * (E + 1));
-	opt = 0;
+	memcpy(st.g, g, sizeof(edge) * N * N);
+	memcpy(st.a, a, sizeof(agent) * 2 * (E + 1));
 	agent k[2 * N] = {0};
-	agent k1[2 * N];
-	for (i = 0; i < 2 * N; i++) k1[i] = 1;
 
 	/*for (i = 0; i < N; i++) printf("%u ", st.dr[i]);
 	puts("");
@@ -379,7 +375,7 @@ int main(int argc, char *argv[]) {
 
 	penny cst = PATHCOST(di) + CARCOST * D;
 	for (j = 0; j < 2 * N; j += 2) if (!k[j]) cst += TICKETCOST;
-	printf("%u,%u,%u,%llu,%u\n", N, D, SEED, in, cst);
+	printf("%u,%u,%llu,%u,%u\n", N, D, SEED, in, cst);
 
 	free(stops);
 	free(idx);
