@@ -2,6 +2,8 @@
  * KERNEL
  */
 
+typedef float payoff;
+
 __attribute__((always_inline)) inline
 sign twiddle(sign *x, sign *y, sign *z, sign *p) {
 
