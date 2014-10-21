@@ -3,6 +3,7 @@
  */
 
 typedef float payoff;
+typedef int16_t sign;
 
 __attribute__((always_inline)) inline
 sign twiddle(sign *x, sign *y, sign *z, sign *p) {
