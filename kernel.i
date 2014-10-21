@@ -166,7 +166,7 @@ type vectorsum(const agent *r, agent n, const type *x) {
 }
 
 __attribute__((always_inline)) inline
-void coalition(const agent *c, payoff *sm, const payoff *x, const agent *ai, agent d, const meter *sp) {
+void coalition(agent *c, payoff *sm, const payoff *x, const agent *ai, agent d, const meter *sp) {
 
 	agent nc[N];
 	memcpy(nc + 1, csg, sizeof(agent) * (*nc = c[1]));
@@ -249,13 +249,22 @@ void creatematrix(agent *r, agent *f, payoff *sm, const payoff *x, const agent *
 	}
 }
 
-void computekernel(payoff *x, payoff epsilon, const agent *ai, penny sw, const agent *a, const agent *dr, const meter *sp) {
+void computekernel(payoff *x, payoff epsilon, stack sol, penny sw, const agent *a, const agent *dr, const meter *sp) {
 
-	agent l[N * N], r[(CAR + 1) * N], f[(N + 1) * N];
-	register agent mi = 0, mj = 0, it = 1, i, j;
-	register payoff t, p, vmj, d;
+	agent ai[N], l[N * N], r[(CAR + 1) * N], f[(N + 1) * N];
+	register agent mi = 0, mj = 0, it = 1, *p = sol.n + N + 1, i = sol.n[N], j;
+	register payoff t, vmj, d, e;
 	adjacencylist(a + 2, l);
 	payoff sm[N * N];
+
+	do {
+		register payoff v = COST(*p, sol.dr, sol.l);
+		for (j = 0; j < X(sol.s, *p); j++) {
+			x[sol.cs[Y(sol.s, *p) + j]] = -v / X(sol.s, *p);
+			ai[sol.cs[Y(sol.s, *p) + j]] = *p;
+		}
+		p++;
+	} while (--i);
 
 	do {
 		printf("Iteration %u\n", it++);
@@ -267,9 +276,9 @@ void computekernel(payoff *x, payoff epsilon, const agent *ai, penny sw, const a
 				if ((t = sm[i * N + j] - sm[j * N + i]) > d) { d = t; mi = i; mj = j; }
 
 		vmj = dr[mj] ? PATHCOST(sp[2 * mj * 2 * N + 2 * mj + 1]) : TICKETCOST;
-		if ((p = x[mj] + vmj) >= d / 2) p = d / 2;
-		x[mi] += p;
-		x[mj] -= p;
+		if ((e = x[mj] + vmj) >= d / 2) e = d / 2;
+		x[mi] += e;
+		x[mj] -= e;
 
 	} while (d / sw > epsilon);
 }

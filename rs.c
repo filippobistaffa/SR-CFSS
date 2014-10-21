@@ -133,13 +133,13 @@ void minsse(meter *b, agent n) {
 }
 
 __attribute__((always_inline)) inline
-meter minpath(const agent *c, agent n, agent dr, const meter *sp) {
+meter minpath(agent *c, agent n, agent dr, const meter *sp) {
 
 	meter r[R5];
-	//register agent t, i = 1;
+	register agent t, i = 1;
 	register meter min = UINT_MAX;
 
-	//do {
+	do {
 		switch (n) {
 			case 5:
 				#include "paths5.h"
@@ -163,12 +163,12 @@ meter minpath(const agent *c, agent n, agent dr, const meter *sp) {
 
 		if (r[0] < min) min = r[0];
 
-	/*	if (dr != 1) {
+		if (dr != 1) {
 			t = c[0];
 			c[0] = c[i];
 			c[i++] = t;
 		}
-	} while (--dr);*/
+	} while (--dr);
 
 	return min;
 }
@@ -891,20 +891,7 @@ int main(int argc, char *argv[]) {
 	printcs(sol.s, sol.cs, sol.n, sol.dr, sol.l);
 
 	payoff x[N];
-	agent ai[N];
-	register agent *p = sol.n + N + 1;
-	i = sol.n[N];
-
-	do {
-		register payoff v = COST(*p, sol.dr, sol.l);
-		for (j = 0; j < X(sol.s, *p); j++) {
-			x[sol.cs[Y(sol.s, *p) + j]] = -v / X(sol.s, *p);
-			ai[sol.cs[Y(sol.s, *p) + j]] = *p;
-		}
-		p++;
-	} while (--i);
-
-	computekernel(x, 0.1, ai, opt, st[0].a, st[0].dr, sp);
+	computekernel(x, 0.1, sol, opt, st[0].a, st[0].dr, sp);
 
 	/*
 	printf("Total cost with ridesharing = %.2f£\n", POUND(opt));
