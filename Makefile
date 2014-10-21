@@ -1,16 +1,25 @@
 .PHONY:
 
+CMP=g++
+OPT=-Wall -Ofast -march=native -funroll-loops -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16
+DBG=-Wall -O0 -g
+NOOPT=-Wall -O0 -march=native
+OUT=./rs
+
 all:
-	gcc -Wall -Ofast -march=native -funroll-loops -fopenmp -ftree-vectorizer-verbose=0 -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 *.c -o rs
+	${CMP} ${OPT} *.c -o ${OUT}
+
+debug:
+	${CMP} ${DBG} *.c -o ${OUT}
 
 noopt:
-	gcc -Wall -march=native -O0 -fopenmp *.c -lm -o rs
+	${CMP} ${NOOPT} *.c -o ${OUT}
 
-profile:
-	gcc -Wall -Ofast -march=native -funroll-loops -fopenmp -ftree-vectorizer-verbose=0 -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 -fprofile-generate *.c -o rs
+profilegen:
+	${CMP} ${OPT} -fprofile-generate *.c -o ${OUT}
 
-icc:
-	/opt/intel/bin/icc -I/usr/include/x86_64-linux-gnu -fast -opt-prefetch -unroll-aggressive -m64 -opt-report=0 -vec-report=0 -openmp -openmp-report0 *.c -o rs
+profileuse:
+	${CMP} ${OPT} -fprofile-use *.c -o ${OUT}
 
 run:
-	./rs
+	${OUT}

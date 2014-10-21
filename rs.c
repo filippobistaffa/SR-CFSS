@@ -4,8 +4,8 @@ uint64_t count;
 static uint64_t split[E];
 
 penny opt;
-static agent csg[N];
-static agent sg[2 * N];
+static stack sol;
+static agent csg[N], sg[2 * N];
 
 void printpath(agent *q, agent *s, agent *p) {
 
@@ -133,13 +133,13 @@ void minsse(meter *b, agent n) {
 }
 
 __attribute__((always_inline)) inline
-meter minpath(agent *c, agent n, agent dr, const meter *sp) {
+meter minpath(const agent *c, agent n, agent dr, const meter *sp) {
 
 	meter r[R5];
-	register agent t, i = 1;
+	//register agent t, i = 1;
 	register meter min = UINT_MAX;
 
-	do {
+	//do {
 		switch (n) {
 			case 5:
 				#include "paths5.h"
@@ -163,12 +163,12 @@ meter minpath(agent *c, agent n, agent dr, const meter *sp) {
 
 		if (r[0] < min) min = r[0];
 
-		if (dr != 1) {
+	/*	if (dr != 1) {
 			t = c[0];
 			c[0] = c[i];
 			c[i++] = t;
 		}
-	} while (--dr);
+	} while (--dr);*/
 
 	return min;
 }
@@ -446,7 +446,7 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 	count++;
 	stack cur = *st;
 	if (cnt) (*cnt)++;
-	if (tot < opt) opt = tot;
+	if (tot < opt) { sol = cur; opt = tot; }
 	if (bound(cur.a, cur.n, c, r, d, cur.s, cur.cs, cur.dr, cur.l, sp) >= opt - MINGAIN) return;
 
 	__m128i h[R], rt[R];
@@ -531,14 +531,14 @@ item dequeue(item *q, place n) {
 
 meter astar(place start, place dest, place nodes, const id *idx, const place *adj, const dist *d) {
 
-	uint8_t *cset = calloc(nodes, sizeof(uint8_t));
-	uint8_t *inoset = calloc(nodes, sizeof(uint8_t));
+	uint8_t *cset = (uint8_t *)calloc(nodes, sizeof(uint8_t));
+	uint8_t *inoset = (uint8_t *)calloc(nodes, sizeof(uint8_t));
 	register place cur, deg, nbr, q = 1;
 	const place *nbrs;
 	register dist t;
 
-	item *oset = malloc(sizeof(item) * nodes);
-	dist *g = malloc(sizeof(dist) * nodes);
+	item *oset = (item *)malloc(sizeof(item) * nodes);
+	dist *g = (dist *)malloc(sizeof(dist) * nodes);
 
 	register item i = { .p = start, .f = (g[start] = 0) + d[start * nodes + dest] };
 	oset[0] = i;
@@ -585,7 +585,7 @@ meter astar(place start, place dest, place nodes, const id *idx, const place *ad
 void shuffle(void *array, size_t n, size_t size) {
 
 	uint8_t tmp[size];
-	uint8_t *arr = array;
+	uint8_t *arr = (uint8_t *)array;
 
 	if (n > 1) {
 		size_t i;
@@ -749,6 +749,8 @@ void createScaleFree(edge *g, agent *a) {
 	}
 }
 
+#include "kernel.i"
+
 int main(int argc, char *argv[]) {
 
 	/*
@@ -775,7 +777,7 @@ int main(int argc, char *argv[]) {
 	f = fopen(XY, "rb");
 	fread(&nodes, sizeof(place), 1, f);
 
-	uint32_t *xy = malloc(sizeof(uint32_t) * 2 * nodes);
+	uint32_t *xy = (uint32_t *)malloc(sizeof(uint32_t) * 2 * nodes);
 	fread(xy, sizeof(uint32_t), 2 * nodes, f);
 	fclose(f);
 
@@ -783,7 +785,7 @@ int main(int argc, char *argv[]) {
 
 	f = fopen(ADJ, "rb");
 	fread(&edges, sizeof(place), 1, f);
-	place *adj = malloc(sizeof(place) * (2 * edges + nodes));
+	place *adj = (place *)malloc(sizeof(place) * (2 * edges + nodes));
 	fread(adj, sizeof(place), 2 * edges + nodes, f);
 	fclose(f);
 
@@ -792,7 +794,7 @@ int main(int argc, char *argv[]) {
 	// adjaciency indexes
 
 	f = fopen(IDX, "rb");
-	id *idx = malloc(sizeof(id) * nodes);
+	id *idx = (id *)malloc(sizeof(id) * nodes);
 	fread(idx, sizeof(id), nodes, f);
 	fclose(f);
 
@@ -802,14 +804,14 @@ int main(int argc, char *argv[]) {
 	fread(&pool, sizeof(agent), 1, f);
 	//printf("%u possible agents, choosing %u\n", pool, N);
 
-	place *stops = malloc(sizeof(place) * 2 * pool);
+	place *stops = (place *)malloc(sizeof(place) * 2 * pool);
 	fread(stops, sizeof(place), 2 * pool, f);
 	fclose(f);
 
 	srand(SEED);
 	shuffle(stops, pool, sizeof(place) * 2);
-	stops = realloc(stops, sizeof(place) * 2 * N);
-	dist *ds = calloc(nodes * nodes, sizeof(dist));
+	stops = (place *)realloc(stops, sizeof(place) * 2 * N);
+	dist *ds = (dist *)calloc(nodes * nodes, sizeof(dist));
 
 	register place i, j;
 	register dist dx, dy;
@@ -821,7 +823,7 @@ int main(int argc, char *argv[]) {
 			ds[i * nodes + j] = ds[j * nodes + i] = DIST(dx, dy);
 		}
 
-	meter *sp = calloc(4 * N * N, sizeof(meter));
+	meter *sp = (meter *)calloc(4 * N * N, sizeof(meter));
 	//printf("Using %u threads\n", omp_get_max_threads());
 
 	//#pragma omp parallel for schedule(dynamic) private(i, j)
@@ -853,9 +855,9 @@ int main(int argc, char *argv[]) {
 
 	penny in = opt;
 	init(SEED);
-	//createScaleFree(st[0].g, st[0].a);
-	memcpy(st[0].g, g, sizeof(edge) * N * N);
-	memcpy(st[0].a, a, sizeof(agent) * 2 * (E + 1));
+	createScaleFree(st[0].g, st[0].a);
+	//memcpy(st[0].g, g, sizeof(edge) * N * N);
+	//memcpy(st[0].a, a, sizeof(agent) * 2 * (E + 1));
 
 	#ifdef REORDER
 	edge go[N * N] = {0};
@@ -886,6 +888,23 @@ int main(int argc, char *argv[]) {
 
 	for (i = 1; i < E; i++) maxc = split[i] > maxc ? split[i] : maxc;
 	printf("%u,%u,%u,%llu,%u,%u,%zu,%zu\n", N, D, MINGAIN, SEED, in, opt, count, maxc);
+	printcs(sol.s, sol.cs, sol.n, sol.dr, sol.l);
+
+	payoff x[N];
+	agent ai[N];
+	register agent *p = sol.n + N + 1;
+	i = sol.n[N];
+
+	do {
+		register payoff v = COST(*p, sol.dr, sol.l);
+		for (j = 0; j < X(sol.s, *p); j++) {
+			x[sol.cs[Y(sol.s, *p) + j]] = -v / X(sol.s, *p);
+			ai[sol.cs[Y(sol.s, *p) + j]] = *p;
+		}
+		p++;
+	} while (--i);
+
+	computekernel(x, 0.1, ai, opt, st[0].a, st[0].dr, sp);
 
 	/*
 	printf("Total cost with ridesharing = %.2f£\n", POUND(opt));

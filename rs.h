@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include "types.h"
 
 #define IDX "idx.dat"
 #define ADJ "adj.dat"
@@ -22,14 +23,14 @@
 #define TICKETCOST 300
 #define PENNYPERLITRE 130
 #define METERSPERLITRE 15000
-//#define DRIVERPERC 20
-//#define MINGAIN 1
+#define DRIVERPERC 10
+#define MINGAIN 1
 #define MAXDRIVERS 1
 
 #define REORDER
 
-//#define SEED 456
-//#define N 30
+#define SEED 45688ULL
+#define N 20
 #define K 2
 
 #ifdef METIS
@@ -38,7 +39,7 @@
 #endif
 
 #define D (N * DRIVERPERC / 100)
-//#define E (K * N - (K * (K + 1)) / 2)
+#define E (K * N - (K * (K + 1)) / 2)
 #define R (1 + (((E > N ? E : N) - 1) / 128))
 
 #define MEAN(x, y) (((x) + (y)) / 2)

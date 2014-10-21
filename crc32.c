@@ -90,7 +90,7 @@ static uint32_t crc32_tab[] = {
 
 uint32_t crc32(const void *buf, size_t size)
 {
-	const uint8_t *p = buf;
+	const uint8_t *p = (const uint8_t *)buf;
 	uint32_t crc = 0 ^ ~0U;
 
 	while (size--)
