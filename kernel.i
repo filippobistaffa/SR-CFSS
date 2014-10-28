@@ -395,7 +395,7 @@ void computekernel(payoff *x, payoff epsilon, stack sol, penny sw, const agent *
 	} while (--i);
 
 	do {
-		//printf("Iteration %zu\n", it++);
+		printf("Iteration %zu\n", it++);
 		printf("%zu coalitions\n", CREATEMATRIX(sm, x, l, ai, sp));
 		//printf("CRC32 = %u\n", crc32(sm, sizeof(payoff) * N * N));
 		d = -INFINITY;
