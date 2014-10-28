@@ -6,11 +6,14 @@ static uint64_t split[E];
 struct timeval t1, t2;
 
 penny opt, bou;
+static stack sol;
 static agent csg[N];
 static agent sg[2 * N];
 static agentpath mp[N];
 
-void printpath(agent *q, agent *s, agent *p) {
+#define lt(a, b) (*(a) < *(b))
+
+/*void printpath(agent *q, agent *s, agent *p) {
 
 	register int8_t i;
 
@@ -36,7 +39,7 @@ void printpath(agent *q, agent *s, agent *p) {
 		}
 		printpath(q + *s, s + 1, p + 1);
 	}
-}
+}*/
 
 __attribute__((always_inline)) inline
 void memcpyaligned(void* dest, const void* src, const size_t size) {
@@ -244,7 +247,7 @@ void printcs(const agent *s, const agent *cs, const agent *n, const agent *dr, c
 		i = *(p++);
                 printf("{ ");
                 for (j = 0; j < X(s, i); j++)
-                	printf("%s%u%s%s ", i == cs[Y(s, i) + j] ? "<" : "", cs[Y(s, i) + j], i == cs[Y(s, i) + j] ? ">" : "", j < dr[i] ? "*" : "");
+                	printf("%s%zu%s%s ", i == cs[Y(s, i) + j] ? "<" : "", cs[Y(s, i) + j], i == cs[Y(s, i) + j] ? ">" : "", j < dr[i] ? "*" : "");
                 printf("} (%um) = %.2f£\n", l[i], POUND(COST(i, dr, l)));
         } while (--m);
 }
@@ -261,7 +264,6 @@ void printcsordered(const agent *s, const agent *cs, const agent *n) {
 	do {
 		ct[k].a = i = *(p++);
 		ct[k].x = 0;
-		#define lt(a, b) (*(a) < *(b))
 		QSORT(agent, cst + Y(s, i), j = X(s, i), lt);
 		do ct[k].x = (ct[k].x * N) + cst[Y(s, i) + j - 1];
 		while (--j);
@@ -273,7 +275,7 @@ void printcsordered(const agent *s, const agent *cs, const agent *n) {
 
 	for (i = 0; i < k; i++) {
 		printf("{ ");
-		for (j = 0; j < X(s, ct[i].a); j++) printf("%u ", cst[Y(s, ct[i].a) + j]);
+		for (j = 0; j < X(s, ct[i].a); j++) printf("%zu ", cst[Y(s, ct[i].a) + j]);
 		printf("} ");
 	}
 	puts("");
@@ -422,7 +424,10 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 	stack cur = *st;
 	count++;
 	if (cnt) (*cnt)++;
-	if (tot < opt) bou = opt = tot;
+	if (tot < opt) { sol = cur; bou = opt = tot; }
+	//
+	if (stop) return;
+	//
 	register penny b = bound(cur.a, cur.n, c, r, d, cur.s, cur.cs, cur.dr, cur.l, sp);
 	if (stop) { if (b < bou) bou = b; return; }
 	else if (b >= opt - MINGAIN) return;
@@ -509,14 +514,14 @@ item dequeue(item *q, place n) {
 
 meter astar(place start, place dest, place nodes, const id *idx, const place *adj, const dist *d) {
 
-	uint8_t *cset = calloc(nodes, sizeof(uint8_t));
-	uint8_t *inoset = calloc(nodes, sizeof(uint8_t));
+	uint8_t *cset = (uint8_t *)calloc(nodes, sizeof(uint8_t));
+	uint8_t *inoset = (uint8_t *)calloc(nodes, sizeof(uint8_t));
 	register place cur, deg, nbr, q = 1;
 	const place *nbrs;
 	register dist t;
 
-	item *oset = malloc(sizeof(item) * nodes);
-	dist *g = malloc(sizeof(dist) * nodes);
+	item *oset = (item *)malloc(sizeof(item) * nodes);
+	dist *g = (dist *)malloc(sizeof(dist) * nodes);
 
 	register item i = { .p = start, .f = (g[start] = 0) + d[start * nodes + dest] };
 	oset[0] = i;
@@ -563,7 +568,7 @@ meter astar(place start, place dest, place nodes, const id *idx, const place *ad
 void shuffle(void *array, size_t n, size_t size) {
 
 	uint8_t tmp[size];
-	uint8_t *arr = array;
+	uint8_t *arr = (uint8_t *)array;
 
 	if (n > 1) {
 		size_t i;
@@ -727,6 +732,8 @@ void createScaleFree(edge *g, agent *a) {
 	}
 }
 
+#include "kernel.i"
+
 int main(int argc, char *argv[]) {
 
 	/*
@@ -753,7 +760,7 @@ int main(int argc, char *argv[]) {
 	f = fopen(XY, "rb");
 	fread(&nodes, sizeof(place), 1, f);
 
-	uint32_t *xy = malloc(sizeof(uint32_t) * 2 * nodes);
+	uint32_t *xy = (uint32_t *)malloc(sizeof(uint32_t) * 2 * nodes);
 	fread(xy, sizeof(uint32_t), 2 * nodes, f);
 	fclose(f);
 
@@ -761,14 +768,14 @@ int main(int argc, char *argv[]) {
 
 	f = fopen(ADJ, "rb");
 	fread(&edges, sizeof(place), 1, f);
-	place *adj = malloc(sizeof(place) * (2 * edges + nodes));
+	place *adj = (place *)malloc(sizeof(place) * (2 * edges + nodes));
 	fread(adj, sizeof(place), 2 * edges + nodes, f);
 	fclose(f);
 
 	// adjaciency indexes
 
 	f = fopen(IDX, "rb");
-	id *idx = malloc(sizeof(id) * nodes);
+	id *idx = (id *)malloc(sizeof(id) * nodes);
 	fread(idx, sizeof(id), nodes, f);
 	fclose(f);
 
@@ -777,11 +784,11 @@ int main(int argc, char *argv[]) {
 	f = fopen(SS, "rb");
 	fread(&pool, sizeof(uint16_t), 1, f);
 
-	place *stops = malloc(sizeof(place) * pool);
+	place *stops = (place *)malloc(sizeof(place) * pool);
 	fread(stops, sizeof(place), pool, f);
 	fclose(f);
 
-	dist *ds = calloc(nodes * nodes, sizeof(dist));
+	dist *ds = (dist *)calloc(nodes * nodes, sizeof(dist));
 
 	register place i, j;
 	register dist dx, dy;
@@ -795,8 +802,8 @@ int main(int argc, char *argv[]) {
 
 	srand(SEED);
 	shuffle(stops, pool, sizeof(place));
-	stops = realloc(stops, sizeof(place) * 2 * N);
-	meter *sp = calloc(4 * N * N, sizeof(meter));
+	stops = (place *)realloc(stops, sizeof(place) * 2 * N);
+	meter *sp = (meter *)calloc(4 * N * N, sizeof(meter));
 
 	#pragma omp parallel for schedule(dynamic) private(i, j)
 	for (i = 0; i < 2 * N; i++) {
@@ -808,8 +815,11 @@ int main(int argc, char *argv[]) {
 	free(ds);
 	free(adj);
 
-	stack st[N];
-	//stack *st = malloc(sizeof(stack) * N);
+	//f = fopen("sp.dat", "wb");
+	//fwrite(sp, sizeof(meter), 4 * N * N, f);
+        //fclose(f);
+
+	stack *st = (stack *)aligned_alloc(128, sizeof(stack) * N);
 	memset(st[0].g, 0, sizeof(edge) * N * N);
 
 	for (i = 0; i < D; i++) st[0].dr[i] = 1;
@@ -874,15 +884,36 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < R; i++)
 		r[i] = c[i] = d[i] = _mm_setzero_si128();
 
+	sol = st[0];
 	gettimeofday(&t1, NULL);
 	edgecontraction(st, 0, c, r, d, opt, sp, NULL);
+	//f = fopen("sol.dat", "wb");
+	//fwrite(&sol, sizeof(stack), 1, f);
+	//fclose(f);
+	//f = fopen("opt.dat", "wb");
+	//fwrite(&opt, sizeof(penny), 1, f);
+	//fclose(f);
 	printf("%u,%u,%llu,%u,%u,%u,%u\n", N, D, SEED, LIMIT, in, opt, bou);
+	printf("%zu\n", sol.n[N]);
+	if (sol.n[N] == N) {
+		puts("No coalitions formed");
+		return 0;
+	}
 
+	// Kernel Computation
+
+	gettimeofday(&t1, NULL);
+	payoff x[N];
+	agent dr[N], a[2 * (E + 1)];
+	memcpy(dr, st[0].dr, sizeof(agent) * N);
+	memcpy(a, st[0].a, sizeof(agent) * 2 * (E + 1));
 	free(stops);
 	free(idx);
 	free(xy);
+	free(st);
+	computekernel(x, 0.1, sol, opt, a, dr, sp);
+	gettimeofday(&t2, NULL);
+	printf("%.2f seconds\n", (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
 	free(sp);
-	//free(st);
-
 	return 0;
 }

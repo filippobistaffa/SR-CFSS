@@ -3,7 +3,7 @@
  */
 
 typedef float payoff;
-typedef int32_t sign;
+typedef int64_t sign;
 static agent drg[N];
 static size_t bcm[(N + 1) * (N + 1)], pm[N * N];
 
@@ -95,7 +95,7 @@ void printc(const agent *c, payoff v) {
 
 	register agent n = *c;
 	printf("{ ");
-	while (n--) printf("%u ", *(++c));
+	while (n--) printf("%zu ", *(++c));
 	printf("} = %f\n", v);
 }
 
@@ -213,6 +213,7 @@ size_t slyce(agent *r, agent *f, agent m, const agent *l, payoff *sm, const payo
 
 	if (*r && (d || *r == 1)) {
 		if (sm) coalition(r, sm, x, ai, d, sp);
+		//else printc(r, d);
 		ret++;
 	}
 
@@ -280,8 +281,13 @@ void li(const agent *f, agent i, agent s, agent *c) {
 
 size_t dslyce(agent id, agent m, const agent *l, payoff *sm, const payoff *x, const agent *ai, const meter *sp) {
 
-	agent r[(CAR + 1) * N], f[(N + 1) * N], ft[N], a[3] = {1, id, 0};
+	register agent *r = (agent *)malloc(sizeof(agent) * (CAR + 1) * N);
+	register agent *f = (agent *)malloc(sizeof(agent) * (N + 1) * N);
+	register agent *ft = (agent *)malloc(sizeof(agent) * N);
+	agent a[3] = {1, id, 0};
+
 	if (sm) coalition(a, sm, x, ai, drg[id], sp);
+	//else printc(a, drg[id]);
         register agent d, i, j, k;
 	register size_t ret = 1;
 
@@ -306,14 +312,19 @@ size_t dslyce(agent id, agent m, const agent *l, payoff *sm, const payoff *x, co
                 }
         }
 
+	free(ft);
+	free(f);
+	free(r);
         return ret;
 }
 
 __attribute__((always_inline)) inline
-void creatematrix(payoff *sm, const payoff *x, const agent *l, const agent *ai, const meter *sp) {
+size_t creatematrix(payoff *sm, const payoff *x, const agent *l, const agent *ai, const meter *sp) {
 
 	register agent i, j;
-	agent r[(CAR + 1) * N], f[(N + 1) * N];
+	register agent *r = (agent *)malloc(sizeof(agent) * (CAR + 1) * N);
+	register agent *f = (agent *)malloc(sizeof(agent) * (N + 1) * N);
+        size_t ret = 0;
 
 	for (i = 0; i < N; i++)
 		for (j = i; j < N; j++)
@@ -321,25 +332,34 @@ void creatematrix(payoff *sm, const payoff *x, const agent *l, const agent *ai, 
 
 	for (i = 0; i < N; i++) {
 		r[0] = 0; f[0] = 1; f[1] = i;
-		slyce(r, f, CAR, l, sm, x, 0, ai, sp);
+		ret += slyce(r, f, CAR, l, sm, x, 0, ai, sp);
 	}
+
+	free(f);
+	free(r);
+	return ret;
 }
 
 __attribute__((always_inline)) inline
-void creatematrixdslyce(payoff *sm, const payoff *x, const agent *l, const agent *ai, const meter *sp) {
+size_t creatematrixdslyce(payoff *sm, const payoff *x, const agent *l, const agent *ai, const meter *sp) {
 
-	register agent i, j, k, t = omp_get_max_threads();
+	register agent i, j, k, tid, t = omp_get_max_threads();
 	payoff *tsm = (payoff *)malloc(sizeof(payoff) * N * N * t);
-	printf("%u threads\n", t);
+	printf("%zu threads\n", t);
+        size_t ret = 0, c[t];
+
+        for (i = 0; i < t; i++) c[i] = 0;
 
 	for (k = 0; k < t; k++)
 		for (i = 0; i < N; i++)
 			for (j = i; j < N; j++)
 				tsm[k * N * N + i * N + j] = tsm[k * N * N + j * N + i] = -INFINITY;
 
-	#pragma omp parallel for schedule(dynamic) private(i)
-	for (i = 0; i < N; i++)
-                dslyce(i, CAR, l, tsm + omp_get_thread_num() * N * N, x, ai, sp);
+	#pragma omp parallel for schedule(dynamic) private(i, tid)
+	for (i = 0; i < N; i++) {
+		tid = omp_get_thread_num();
+                c[tid] += dslyce(i, CAR, l, tsm + tid * N * N, x, ai, sp);
+	}
 
 	memcpy(sm, tsm, sizeof(payoff) * N * N);
 
@@ -349,12 +369,15 @@ void creatematrixdslyce(payoff *sm, const payoff *x, const agent *l, const agent
 				sm[i * N + j] = max(sm[i * N + j], tsm[k * N * N + i * N + j]);
 
 	free(tsm);
+        for (i = 0; i < t; i++) ret += c[i];
+        return ret;
 }
 
 void computekernel(payoff *x, payoff epsilon, stack sol, penny sw, const agent *a, const agent *dr, const meter *sp) {
 
 	filltables();
-	agent ai[N], l[N * N];
+	register agent *ai = (agent *)malloc(sizeof(agent) * N);
+	register agent *l = (agent *)malloc(sizeof(agent) * N * N);
 	register agent mi = 0, mj = 0, it = 1, *p = sol.n + N + 1, i = sol.n[N], j;
 	register payoff t, vmj, d, e;
 	memcpy(drg, dr, sizeof(agent) * N);
@@ -372,15 +395,17 @@ void computekernel(payoff *x, payoff epsilon, stack sol, penny sw, const agent *
 	} while (--i);
 
 	do {
-		printf("Iteration %u\n", it++);
-		creatematrix(sm, x, l, ai, sp);
-		//creatematrixdslyce(sm, x, l, ai, sp);
-		printf("CRC32 = %u\n", crc32(sm, sizeof(payoff) * N * N));
+		//printf("Iteration %zu\n", it++);
+		printf("%zu coalitions\n", CREATEMATRIX(sm, x, l, ai, sp));
+		//printf("CRC32 = %u\n", crc32(sm, sizeof(payoff) * N * N));
 		d = -INFINITY;
 
 		for (i = 0; i < N; i++)
-			for (j = i + 1; j < N; j++)
-				if ((t = sm[i * N + j] - sm[j * N + i]) > d) { d = t; mi = i; mj = j; }
+			for (j = i + 1; j < N; j++) {
+				if (sm[i * N + j] == -INFINITY && sm[j * N + i] == -INFINITY) t = -INFINITY;
+				else t = sm[i * N + j] - sm[j * N + i];
+				if (t > d) { d = t; mi = i; mj = j; }
+			}
 
 		vmj = drg[mj] ? PATHCOST(sp[2 * mj * 2 * N + 2 * mj + 1]) : TICKETCOST;
 		if ((e = x[mj] + vmj) >= d / 2) e = d / 2;
@@ -388,6 +413,9 @@ void computekernel(payoff *x, payoff epsilon, stack sol, penny sw, const agent *
 		x[mj] -= e;
 
 	} while (d / sw > epsilon);
+
+	free(ai);
+	free(l);
 }
 
 __attribute__((always_inline)) inline
@@ -415,7 +443,7 @@ size_t enumeratedslyce(const agent *a, const agent *dr) {
 	memcpy(drg, dr, sizeof(agent) * N);
         adjacencylist(a + 2, l);
         register agent i, t = omp_get_max_threads();
-	printf("%u threads\n", t);
+	printf("%zu threads\n", t);
         size_t ret = 0, c[t];
 
         for (i = 0; i < t; i++) c[i] = 0;
