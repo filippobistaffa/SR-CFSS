@@ -755,7 +755,7 @@ int main(int argc, char *argv[]) {
 
 	FILE *f;
 	place nodes, edges;
-	agent pool;
+	uint16_t pool;
 
 	f = fopen(XY, "rb");
 	fread(&nodes, sizeof(place), 1, f);
@@ -893,15 +893,6 @@ int main(int argc, char *argv[]) {
 	//f = fopen("opt.dat", "wb");
 	//fwrite(&opt, sizeof(penny), 1, f);
 	//fclose(f);
-	printf("%u,%u,%llu,%u,%u,%u,%u\n", N, D, SEED, LIMIT, in, opt, bou);
-	printf("%zu\n", sol.n[N]);
-	if (sol.n[N] == N) {
-		puts("No coalitions formed");
-		return 0;
-	}
-
-	// Kernel Computation
-
 	gettimeofday(&t1, NULL);
 	payoff x[N];
 	agent dr[N], a[2 * (E + 1)];
@@ -911,9 +902,9 @@ int main(int argc, char *argv[]) {
 	free(idx);
 	free(xy);
 	free(st);
-	computekernel(x, 0.1, sol, opt, a, dr, sp);
+	if (sol.n[N] != N) computekernel(x, EPSILON, sol, opt, a, dr, sp);
 	gettimeofday(&t2, NULL);
-	printf("%.2f seconds\n", (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
 	free(sp);
+	printf("%u,%zu,%u,%llu,%u,%u,%u,%u,%f\n", N, sol.n[N], D, SEED, LIMIT, in, opt, bou, (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
 	return 0;
 }

@@ -378,7 +378,7 @@ void computekernel(payoff *x, payoff epsilon, stack sol, penny sw, const agent *
 	filltables();
 	register agent *ai = (agent *)malloc(sizeof(agent) * N);
 	register agent *l = (agent *)malloc(sizeof(agent) * N * N);
-	register agent mi = 0, mj = 0, it = 1, *p = sol.n + N + 1, i = sol.n[N], j;
+	register agent mi = 0, mj = 0, *p = sol.n + N + 1, i = sol.n[N], j; //it = 1;
 	register payoff t, vmj, d, e;
 	memcpy(drg, dr, sizeof(agent) * N);
 	QSORT(agent, csg, N, ltdr);
@@ -395,8 +395,9 @@ void computekernel(payoff *x, payoff epsilon, stack sol, penny sw, const agent *
 	} while (--i);
 
 	do {
-		printf("Iteration %zu\n", it++);
-		printf("%zu coalitions\n", CREATEMATRIX(sm, x, l, ai, sp));
+		//printf("Iteration %zu\n", it++);
+		//printf("%zu coalitions\n", CREATEMATRIX(sm, x, l, ai, sp));
+		CREATEMATRIX(sm, x, l, ai, sp);
 		//printf("CRC32 = %u\n", crc32(sm, sizeof(payoff) * N * N));
 		d = -INFINITY;
 
@@ -443,7 +444,7 @@ size_t enumeratedslyce(const agent *a, const agent *dr) {
 	memcpy(drg, dr, sizeof(agent) * N);
         adjacencylist(a + 2, l);
         register agent i, t = omp_get_max_threads();
-	printf("%zu threads\n", t);
+	//printf("%zu threads\n", t);
         size_t ret = 0, c[t];
 
         for (i = 0; i < t; i++) c[i] = 0;
