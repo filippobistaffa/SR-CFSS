@@ -4,6 +4,26 @@
 
 typedef float payoff;
 typedef int16_t sign;
+static agent drg[N];
+static size_t bcm[(N + 1) * (N + 1)], pm[N * N];
+
+#define P(_s, _i) (pm[(_s) * N + (_i)])
+#define C(_n, _m) (bcm[(_n) * (N + 1) + (_m)])
+#define max(_x, _y) ((_x) > (_y) ? (_x) : (_y))
+#define min(_x, _y) ((_x) < (_y) ? (_x) : (_y))
+#define ltdr(_a, _b) (drg[*(_a)] == drg[*(_b)] ? (*(_a)) < (*(_b)) : drg[*(_a)] > drg[*(_b)])
+#define ledr(_a, _b) (drg[*(_a)] == drg[*(_b)] ? (*(_a)) <= (*(_b)) : drg[*(_a)] > drg[*(_b)])
+
+void filltables() {
+
+	register agent i, j;
+	for (i = 0; i <= N; i++) C(i, 0) = C(i, i) = 1ULL;
+	for (i = 1; i <= N; i++) for (j = 1; j < i; j++) C(i, j) = C(i - 1, j - 1) + C(i - 1, j);
+
+	for (i = 1; i < N; i++) P(i, 1) = 1ULL;
+	for (i = 2; i < N; i++) P(1, i) = i;
+	for (i = 2; i < N; i++) for (j = 2; j < N; j++) P(i, j) = P(i - 1, j) + P(i, j - 1);
+}
 
 __attribute__((always_inline)) inline
 sign twiddle(sign *x, sign *y, sign *z, sign *p) {
@@ -91,8 +111,7 @@ void adjacencylist(const agent *a, agent *l) {
 		a += 2;
 	} while (--e);
 
-	#define islt(_a, _b) ((*_a) < (*_b))
-	for (; e < N; e++) QSORT(agent, l + e * N + 1, l[e * N], islt);
+	for (; e < N; e++) QSORT(agent, l + e * N + 1, l[e * N], ltdr);
 }
 
 __attribute__((always_inline)) inline
@@ -101,8 +120,8 @@ void unionsorted(const agent *x, agent m, const agent *y, agent n, agent *z, age
 	*o = 0;
 
 	while (m && n) {
-		if (*x < *y) { *(z++) = *(x++); m--; }
-		else if (*y < *x) { *(z++) = *(y++); n--; }
+		if (ltdr(x, y)) { *(z++) = *(x++); m--; }
+		else if (ltdr(y, x)) { *(z++) = *(y++); n--; }
 		else { *(z++) = *(y++); x++; m--; n--; }
 		(*o)++;
 	}
@@ -118,8 +137,8 @@ void differencesorted(const agent *x, agent m, const agent *y, agent n, agent *z
 	*o = 0;
 
 	while (m && n) {
-		if (*x < *y) { *(z++) = *(x++); m--; (*o)++; }
-		else if (*y < *x) { y++; n--; }
+		if (ltdr(x, y)) { *(z++) = *(x++); m--; (*o)++; }
+		else if (ltdr(y, x)) { y++; n--; }
 		else { y++; x++; m--; n--; }
 	}
 
@@ -151,7 +170,7 @@ void nbar(const agent *f, agent n, const agent *r, const agent *ruf, const agent
 	agent a[N + 1], b[N + 1];
 	neighbours(f, n, l, a);
 	agent i = 0;
-	while (a[i + 1] <= ruf[1] && i < *a) i++;
+	while (i < *a && ledr(a + i + 1, ruf + 1)) i++;
 	memmove(a + 1, a + i + 1, sizeof(agent) * (*a - i));
 	*a -= i;
 	neighbours(r + 1, *r, l, nb);
@@ -172,22 +191,10 @@ __attribute__((always_inline)) inline
 void coalition(agent *c, payoff *sm, const payoff *x, const agent *ai, agent d, const meter *sp) {
 
 	agent nc[N];
-	memcpy(nc + 1, csg, sizeof(agent) * (*nc = c[1]));
 	register agent i, j, *t;
 	register payoff vc = d ? (PATHCOST(minpath(c + 1, *c, 1, sp)) + CARCOST) : TICKETCOST;
-
-	for (i = 1; i < *c; i++) {
-		memcpy(nc + *nc + 1, csg + c[i] + 1, sizeof(agent) * (j = c[i + 1] - c[i] - 1));
-		*nc += j;
-	}
-
-	if (c[*c] != N - 1) {
-		memcpy(nc + *nc + 1, csg + c[*c] + 1, sizeof(agent) * (j = N - 1 - c[*c] - 1));
-		*nc += j;
-	}
-
+	differencesorted(csg, N, c + 1, *c, nc + 1, nc);
 	register payoff vmx = vc + vectorsum<payoff>(c + 1, *c, x);
-	#define max(x, y) ((x) > (y) ? (x) : (y))
 
 	if ((i = *(c++)) && (*nc)) do {
 		j = *nc;
@@ -200,9 +207,15 @@ void coalition(agent *c, payoff *sm, const payoff *x, const agent *ai, agent d, 
 	} while (--i);
 }
 
-void slyce(agent *r, agent *f, agent m, payoff *sm, const payoff *x, const agent *l, agent d, const agent *ai, const agent *dr, const meter *sp) {
+size_t slyce(agent *r, agent *f, agent m, const agent *l, payoff *sm, const payoff *x, agent d, const agent *ai, const meter *sp) {
 
-	if (*r && (d || *r == 1)) coalition(r, sm, x, ai, d, sp);
+	size_t ret = 0;
+
+	if (*r && (d || *r == 1)) {
+		if (sm) coalition(r, sm, x, ai, d, sp);
+		//else printc(r, d);
+		ret++;
+	}
 
 	if (*f && m) {
 
@@ -210,37 +223,108 @@ void slyce(agent *r, agent *f, agent m, payoff *sm, const payoff *x, const agent
 		memcpy(rt, r + 1, sizeof(agent) * *r);
 		sign w, y, z, p[N + 2];
 
-		for (k = 1; k <= (m < *f ? m : *f); k++) {
+		for (k = 1; k <= min(*f, m); k++) {
 			*nr = *r + k;
 			memcpy(nr + 1, r + 1, sizeof(agent) * *r);
 			memcpy(fs, f + *f - k + 1, sizeof(agent) * k);
-			register agent nd = vectorsum<agent>(fs, k, dr);
+			register agent nd = vectorsum<agent>(fs, k, drg);
 			if (d + nd <= MAXDRIVERS) {
 				memcpy(nfs, fs, sizeof(agent) * k);
-				QSORT(agent, nr + 1, *nr, islt);
+				QSORT(agent, nr + 1, *nr, ltdr);
 				nbar(fs, k, r, nr, l, nf);
-				slyce(nr, nf, m - k, sm, x, l, d + nd, ai, dr, sp);
+				ret += slyce(nr, nf, m - k, l, sm, x, d + nd, ai, sp);
 			}
 			inittwiddle(k, *f, p);
 			while (!twiddle(&w, &y, &z, p)) {
-				nd = nd - dr[fs[z]] + dr[f[w + 1]];
+				nd = nd - drg[fs[z]] + drg[f[w + 1]];
 				fs[z] = f[w + 1];
 				if (d + nd <= MAXDRIVERS) {
 					memcpy(nr + 1, rt, sizeof(agent) * *r);
 					memcpy(nfs, fs, sizeof(agent) * k);
-					QSORT(agent, nr + 1, *nr, islt);
+					QSORT(agent, nr + 1, *nr, ltdr);
 					nbar(fs, k, r, nr, l, nf);
-					slyce(nr, nf, m - k, sm, x, l, d + nd, ai, dr, sp);
+					ret += slyce(nr, nf, m - k, l, sm, x, d + nd, ai, sp);
 				}
 			}
 		}
 	}
+
+	return ret;
 }
 
 __attribute__((always_inline)) inline
-void creatematrix(agent *r, agent *f, payoff *sm, const payoff *x, const agent *l, const agent *ai, const agent *dr, const meter *sp) {
+void li(const agent *f, agent i, agent s, agent *c) {
+
+	register agent x, t = 0, *o = c;
+	i = C(*f, s) - i + 1;
+	*(o++) = s;
+
+	do {
+		x = 1;
+		while (P(s, x) < (size_t)i - t) x++;
+		*(o++) = (*f - s + 1) - x + 1;
+		if (P(s, x) == (size_t)i - t) {
+			while (s-- - 1) { *o = *(o - 1) + 1; o++; }
+			break;
+		}
+		i -= t;
+		t = P(s, x - 1);
+	} while (--s);
+
+	o = c + 1;
+	s = *c;
+
+	do { *o = f[*o]; o++; }
+	while (--s);
+	QSORT(agent, c + 1, *c, ltdr);
+}
+
+size_t dslyce(agent id, agent m, const agent *l, payoff *sm, const payoff *x, const agent *ai, const meter *sp) {
+
+	register agent *r = (agent *)malloc(sizeof(agent) * (CAR + 1) * N);
+	register agent *f = (agent *)malloc(sizeof(agent) * (N + 1) * N);
+	register agent *ft = (agent *)malloc(sizeof(agent) * N);
+	agent a[3] = {1, id, 0};
+
+	if (sm) coalition(a, sm, x, ai, drg[id], sp);
+	//else printc(a, drg[id]);
+        register agent d, i, j, k;
+	register size_t ret = 1;
+
+        for (i = 0; i < N; i++) {
+
+                a[1] = i;
+                nbar(a + 1, 1, a + 2, a, l, f);
+
+                for (k = 1; k <= min(*f, m - 1); k++) {
+			register size_t bc = C(*f, k);
+                        j = bc * id / N;
+                        while (j < bc * (id + 1) / N) {
+				li(f, j + 1, k, ft);
+				j++;
+				unionsorted(a + 1, 1, ft + 1, *ft, r + 1, r);
+				if ((d = vectorsum<agent>(r + 1, *r, drg)) > MAXDRIVERS) continue;
+				nbar(ft + 1, k, a, r, l, f + N + 1);
+				ret += slyce(r, f + N + 1, m - (k + 1), l, sm, x, d, ai, sp);
+                        }
+
+                        id = (id + 1) % N;
+                }
+        }
+
+	free(ft);
+	free(f);
+	free(r);
+        return ret;
+}
+
+__attribute__((always_inline)) inline
+size_t creatematrix(payoff *sm, const payoff *x, const agent *l, const agent *ai, const meter *sp) {
 
 	register agent i, j;
+	register agent *r = (agent *)malloc(sizeof(agent) * (CAR + 1) * N);
+	register agent *f = (agent *)malloc(sizeof(agent) * (N + 1) * N);
+        size_t ret = 0;
 
 	for (i = 0; i < N; i++)
 		for (j = i; j < N; j++)
@@ -248,15 +332,56 @@ void creatematrix(agent *r, agent *f, payoff *sm, const payoff *x, const agent *
 
 	for (i = 0; i < N; i++) {
 		r[0] = 0; f[0] = 1; f[1] = i;
-		slyce(r, f, CAR, sm, x, l, 0, ai, dr, sp);
+		ret += slyce(r, f, CAR, l, sm, x, 0, ai, sp);
 	}
+
+	free(f);
+	free(r);
+	return ret;
+}
+
+__attribute__((always_inline)) inline
+size_t creatematrixdslyce(payoff *sm, const payoff *x, const agent *l, const agent *ai, const meter *sp) {
+
+	register agent i, j, k, tid, t = omp_get_max_threads();
+	payoff *tsm = (payoff *)malloc(sizeof(payoff) * N * N * t);
+	//printf("%u threads\n", t);
+        size_t ret = 0, c[t];
+
+        for (i = 0; i < t; i++) c[i] = 0;
+
+	for (k = 0; k < t; k++)
+		for (i = 0; i < N; i++)
+			for (j = i; j < N; j++)
+				tsm[k * N * N + i * N + j] = tsm[k * N * N + j * N + i] = -INFINITY;
+
+	#pragma omp parallel for schedule(dynamic) private(i, tid)
+	for (i = 0; i < N; i++) {
+		tid = omp_get_thread_num();
+                c[tid] += dslyce(i, CAR, l, tsm + tid * N * N, x, ai, sp);
+	}
+
+	memcpy(sm, tsm, sizeof(payoff) * N * N);
+
+	for (i = 0; i < N; i++)
+		for (j = 0; j < N; j++)
+			for (k = 1; k < t; k++)
+				sm[i * N + j] = max(sm[i * N + j], tsm[k * N * N + i * N + j]);
+
+	free(tsm);
+        for (i = 0; i < t; i++) ret += c[i];
+        return ret;
 }
 
 void computekernel(payoff *x, payoff epsilon, stack sol, penny sw, const agent *a, const agent *dr, const meter *sp) {
 
-	agent ai[N], l[N * N], r[(CAR + 1) * N], f[(N + 1) * N];
-	register agent mi = 0, mj = 0, it = 1, *p = sol.n + N + 1, i = sol.n[N], j;
+	filltables();
+	register agent *ai = (agent *)malloc(sizeof(agent) * N);
+	register agent *l = (agent *)malloc(sizeof(agent) * N * N);
+	register agent mi = 0, mj = 0, *p = sol.n + N + 1, i = sol.n[N], j, it = 1;
 	register payoff t, vmj, d, e;
+	memcpy(drg, dr, sizeof(agent) * N);
+	QSORT(agent, csg, N, ltdr);
 	adjacencylist(a + 2, l);
 	payoff sm[N * N];
 
@@ -271,17 +396,63 @@ void computekernel(payoff *x, payoff epsilon, stack sol, penny sw, const agent *
 
 	do {
 		printf("Iteration %u\n", it++);
-		creatematrix(r, f, sm, x, l, ai, dr, sp);
+		//printf("%zu coalitions\n", CREATEMATRIX(sm, x, l, ai, sp));
+		CREATEMATRIX(sm, x, l, ai, sp);
+		//printf("CRC32 = %u\n", crc32(sm, sizeof(payoff) * N * N));
 		d = -INFINITY;
 
 		for (i = 0; i < N; i++)
-			for (j = i + 1; j < N; j++)
-				if ((t = sm[i * N + j] - sm[j * N + i]) > d) { d = t; mi = i; mj = j; }
+			for (j = i + 1; j < N; j++) {
+				if (sm[i * N + j] == -INFINITY && sm[j * N + i] == -INFINITY) t = -INFINITY;
+				else t = sm[i * N + j] - sm[j * N + i];
+				if (t > d) { d = t; mi = i; mj = j; }
+			}
 
-		vmj = dr[mj] ? PATHCOST(sp[2 * mj * 2 * N + 2 * mj + 1]) : TICKETCOST;
+		vmj = drg[mj] ? PATHCOST(sp[2 * mj * 2 * N + 2 * mj + 1]) : TICKETCOST;
 		if ((e = x[mj] + vmj) >= d / 2) e = d / 2;
 		x[mi] += e;
 		x[mj] -= e;
 
 	} while (d / sw > epsilon);
+
+	free(ai);
+	free(l);
+}
+
+__attribute__((always_inline)) inline
+size_t enumerate(const agent *a, const agent *dr) {
+
+	agent l[N * N], r[(CAR + 1) * N], f[(N + 1) * N];
+	memcpy(drg, dr, sizeof(agent) * N);
+	adjacencylist(a + 2, l);
+	register size_t ret = 0;
+        register agent i;
+
+        for (i = 0; i < N; i++) {
+                r[0] = 0; f[0] = 1; f[1] = i;
+        	ret += slyce(r, f, CAR, l, NULL, NULL, 0, NULL, NULL);
+        }
+
+	return ret;
+}
+
+__attribute__((always_inline)) inline
+size_t enumeratedslyce(const agent *a, const agent *dr) {
+
+	filltables();
+        agent l[N * N];
+	memcpy(drg, dr, sizeof(agent) * N);
+        adjacencylist(a + 2, l);
+        register agent i, t = omp_get_max_threads();
+	//printf("%u threads\n", t);
+        size_t ret = 0, c[t];
+
+        for (i = 0; i < t; i++) c[i] = 0;
+
+	#pragma omp parallel for schedule(dynamic) private(i)
+        for (i = 0; i < N; i++)
+                c[omp_get_thread_num()] += dslyce(i, CAR, l, NULL, NULL, NULL, NULL);
+
+        for (i = 0; i < t; i++) ret += c[i];
+        return ret;
 }

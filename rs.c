@@ -7,7 +7,7 @@ penny opt;
 static stack sol;
 static agent csg[N], sg[2 * N];
 
-void printpath(agent *q, agent *s, agent *p) {
+/*void printpath(agent *q, agent *s, agent *p) {
 
 	register int8_t i;
 
@@ -33,7 +33,7 @@ void printpath(agent *q, agent *s, agent *p) {
 		}
 		printpath(q + *s, s + 1, p + 1);
 	}
-}
+}*/
 
 __attribute__((always_inline)) inline
 void memcpyaligned(void* dest, const void* src, const size_t size) {
@@ -772,7 +772,7 @@ int main(int argc, char *argv[]) {
 
 	FILE *f;
 	place nodes, edges;
-	agent pool;
+	uint16_t pool;
 
 	f = fopen(XY, "rb");
 	fread(&nodes, sizeof(place), 1, f);
@@ -801,7 +801,7 @@ int main(int argc, char *argv[]) {
 	// start and stop points
 
 	f = fopen(SS, "rb");
-	fread(&pool, sizeof(agent), 1, f);
+	fread(&pool, sizeof(uint16_t), 1, f);
 	//printf("%u possible agents, choosing %u\n", pool, N);
 
 	place *stops = (place *)malloc(sizeof(place) * 2 * pool);
@@ -837,7 +837,6 @@ int main(int argc, char *argv[]) {
 	free(adj);
 
 	stack st[N];
-	//stack *st = malloc(sizeof(stack) * N);
 	memset(st[0].g, 0, sizeof(edge) * N * N);
 
 	for (i = 0; i < D; i++) st[0].dr[i] = 1;
@@ -883,15 +882,17 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < R; i++)
 		r[i] = c[i] = d[i] = _mm_setzero_si128();
 
+	sol = st[0];
 	edgecontraction(st, 0, c, r, d, opt, sp, NULL);
 	size_t maxc = split[0];
 
 	for (i = 1; i < E; i++) maxc = split[i] > maxc ? split[i] : maxc;
-	printf("%u,%u,%u,%llu,%u,%u,%zu,%zu\n", N, D, MINGAIN, SEED, in, opt, count, maxc);
-	printcs(sol.s, sol.cs, sol.n, sol.dr, sol.l);
 
 	payoff x[N];
-	computekernel(x, 0.1, sol, opt, st[0].a, st[0].dr, sp);
+	if (sol.n[N] != N) computekernel(x, EPSILON, sol, opt, st[0].a, st[0].dr, sp);
+	printf("%u,%u,%u,%u,%llu,%u,%u,%zu,%zu\n", N, sol.n[N], D, MINGAIN, SEED, in, opt, count, maxc);
+
+	for (i = 0; i < N; i++) printf("%u: %u %f\n", i, COST(i, st[0].dr, st[0].l), x[i]);
 
 	/*
 	printf("Total cost with ridesharing = %.2f£\n", POUND(opt));
@@ -912,7 +913,5 @@ int main(int argc, char *argv[]) {
 	free(idx);
 	free(xy);
 	free(sp);
-	//free(st);
-
 	return 0;
 }
