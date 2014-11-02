@@ -460,12 +460,12 @@ size_t creatematrixdslyce(payoff *sm, const payoff *x, const agent *l, const age
         return ret;
 }
 
-void computekernel(payoff *x, payoff epsilon, const agent *a, const agent *dr, const meter *sp) {
+agent computekernel(payoff *x, payoff epsilon, const agent *a, const agent *dr, const meter *sp) {
 
 	filltables();
 	register agent *ai = (agent *)malloc(sizeof(agent) * N);
 	register agent *l = (agent *)malloc(sizeof(agent) * N * N);
-	register agent mi = 0, mj = 0, *p = sol.n + N + 1, i = sol.n[N], j; //it = 1;
+	register agent mi = 0, mj = 0, *p = sol.n + N + 1, i = sol.n[N], j, it = 0;
 	register payoff t, vmj, d, e;
 	memcpy(drg, dr, sizeof(agent) * N);
 	QSORT(agent, csg, N, ltdr);
@@ -483,7 +483,7 @@ void computekernel(payoff *x, payoff epsilon, const agent *a, const agent *dr, c
 	} while (--i);
 
 	do {
-		//printf("Iteration %u\n", it++);
+		it++;
 		//printf("%zu coalitions\n", CREATEMATRIX(sm, x, l, ai, sp));
 		CREATEMATRIX(sm, x, l, sol.s, sol.cs, ai, sp);
 		//printf("CRC32 = %u\n", crc32(sm, sizeof(payoff) * N * N));
@@ -505,6 +505,7 @@ void computekernel(payoff *x, payoff epsilon, const agent *a, const agent *dr, c
 
 	free(ai);
 	free(l);
+	return it;
 }
 
 __attribute__((always_inline)) inline
@@ -518,7 +519,7 @@ size_t enumerate(const agent *a, const agent *dr) {
 
         for (i = 0; i < N; i++) {
                 r[0] = 0; f[0] = 1; f[1] = i;
-        	ret += slyce(r, f, CAR, l, NULL, NULL, 0, NULL, NULL, NULL, NULL);
+		ret += slyce(r, f, CAR, l, NULL, NULL, 0, NULL, NULL, NULL, NULL);
         }
 
 	return ret;

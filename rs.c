@@ -892,10 +892,10 @@ int main(int argc, char *argv[]) {
 	payoff x[N];
 	//printcs(sol.s, sol.cs, sol.n, sol.dr, sol.l);
 	gettimeofday(&t1, NULL);
-	if (sol.n[N] != N) computekernel(x, EPSILON, st[0].a, st[0].dr, sp);
+	if (sol.n[N] != N) i = computekernel(x, EPSILON, st[0].a, st[0].dr, sp);
 	gettimeofday(&t2, NULL);
-	printf("%u,%u,%u,%u,%llu,%u,%u,%zu,%zu,%f\n", N, sol.n[N], D, MINGAIN, SEED, in, opt, count, maxc,\
-	(double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
+	printf("%u,%u,%u,%u,%llu,%u,%u,%zu,%zu,%u,%f\n", N, sol.n[N], D, MINGAIN, SEED, in, opt,\
+	count, maxc, i, (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
 	//for (i = 0; i < N; i++) printf("%u: %u %f\n", i, COST(i, st[0].dr, st[0].l), -x[i]);
 
 	/*
