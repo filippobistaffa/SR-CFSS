@@ -902,9 +902,9 @@ int main(int argc, char *argv[]) {
 	free(idx);
 	free(xy);
 	free(st);
-	if (sol.n[N] != N) computekernel(x, EPSILON, sol, opt, a, dr, sp);
+	if (sol.n[N] != N) i = computekernel(x, EPSILON, a, dr, sp);
 	gettimeofday(&t2, NULL);
 	free(sp);
-	printf("%u,%zu,%u,%llu,%u,%u,%u,%u,%f\n", N, sol.n[N], D, SEED, LIMIT, in, opt, bou, (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
+	printf("%u,%zu,%u,%llu,%u,%u,%u,%u,%u,%f\n", N, sol.n[N], D, SEED, LIMIT, in, opt, bou, i, (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
 	return 0;
 }
