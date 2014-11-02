@@ -29,7 +29,8 @@
 #define EPSILON 0.1
 
 #define REORDER
-#define PARALLEL
+//#define PARALLEL
+//#define NAIVE
 
 //#define SEED 45688ULL
 //#define N 20
@@ -40,8 +41,10 @@
 #define TOLERANCE 1
 #endif
 
-#ifdef PARALLEL
+#if defined PARALLEL
 #define CREATEMATRIX creatematrixdslyce
+#elif defined NAIVE
+#define CREATEMATRIX creatematrixnaive
 #else
 #define CREATEMATRIX creatematrix
 #endif

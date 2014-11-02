@@ -5,6 +5,7 @@ static uint64_t split[E];
 
 penny opt;
 static stack sol;
+struct timeval t1, t2;
 static agent csg[N], sg[2 * N];
 
 /*void printpath(agent *q, agent *s, agent *p) {
@@ -854,9 +855,9 @@ int main(int argc, char *argv[]) {
 
 	penny in = opt;
 	init(SEED);
-	createScaleFree(st[0].g, st[0].a);
-	//memcpy(st[0].g, g, sizeof(edge) * N * N);
-	//memcpy(st[0].a, a, sizeof(agent) * 2 * (E + 1));
+	//createScaleFree(st[0].g, st[0].a);
+	memcpy(st[0].g, g, sizeof(edge) * N * N);
+	memcpy(st[0].a, a, sizeof(agent) * 2 * (E + 1));
 
 	#ifdef REORDER
 	edge go[N * N] = {0};
@@ -889,10 +890,13 @@ int main(int argc, char *argv[]) {
 	for (i = 1; i < E; i++) maxc = split[i] > maxc ? split[i] : maxc;
 
 	payoff x[N];
-	if (sol.n[N] != N) computekernel(x, EPSILON, sol, opt, st[0].a, st[0].dr, sp);
-	printf("%u,%u,%u,%u,%llu,%u,%u,%zu,%zu\n", N, sol.n[N], D, MINGAIN, SEED, in, opt, count, maxc);
-
-	for (i = 0; i < N; i++) printf("%u: %u %f\n", i, COST(i, st[0].dr, st[0].l), x[i]);
+	//printcs(sol.s, sol.cs, sol.n, sol.dr, sol.l);
+	gettimeofday(&t1, NULL);
+	if (sol.n[N] != N) computekernel(x, EPSILON, st[0].a, st[0].dr, sp);
+	gettimeofday(&t2, NULL);
+	printf("%u,%u,%u,%u,%llu,%u,%u,%zu,%zu,%f\n", N, sol.n[N], D, MINGAIN, SEED, in, opt, count, maxc,\
+	(double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
+	//for (i = 0; i < N; i++) printf("%u: %u %f\n", i, COST(i, st[0].dr, st[0].l), -x[i]);
 
 	/*
 	printf("Total cost with ridesharing = %.2f£\n", POUND(opt));

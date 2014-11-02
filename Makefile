@@ -3,7 +3,7 @@
 CMP=g++
 OPT=-Wall -Ofast -march=native -funroll-loops -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 -Wno-psabi
 DBG=-Wall -O0 -g
-NOOPT=-Wall -O0 -march=native -Wno-psabi
+NOOPT=-Wall -O0 -march=native -Wno-psabi -fopenmp
 OUT=./rs
 
 all:
