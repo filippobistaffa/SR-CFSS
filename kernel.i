@@ -251,6 +251,7 @@ void coalition(agent *c, payoff *sm, const payoff *x, const agent *s, const agen
 	register payoff vmx = vc + vectorsum<payoff>(c + 1, *c, x);
 
 	if ((i = *(c++))) do {
+		ccount[*c]++;
 		differencesorted(cs + Y(s, ai[*c]), X(s, ai[*c]), oc + 1, *oc, nc + 1, nc);
 		j = *nc;
 		t = nc + 1;
@@ -484,8 +485,9 @@ agent computekernel(payoff *x, payoff epsilon, const agent *a, const agent *dr, 
 
 	do {
 		it++;
+		memset(ccount, 0, sizeof(size_t) * N);
 		//printf("%zu coalitions\n", CREATEMATRIX(sm, x, l, ai, sp));
-		CREATEMATRIX(sm, x, l, sol.s, sol.cs, ai, sp);
+		count = CREATEMATRIX(sm, x, l, sol.s, sol.cs, ai, sp);
 		//printf("CRC32 = %u\n", crc32(sm, sizeof(payoff) * N * N));
 		d = -INFINITY;
 
@@ -502,6 +504,41 @@ agent computekernel(payoff *x, payoff epsilon, const agent *a, const agent *dr, 
 		x[mj] -= e;
 
 	} while (d / opt > epsilon);
+
+	size_t minc[N], maxc[N];
+	payoff minp[N], maxp[N];
+
+	for (i = 0; i < N; i++) {
+		minc[i] = UINTMAX_MAX;
+		maxc[i] = 0;
+		minp[i] = INFINITY;
+		maxp[i] = -INFINITY;
+	}
+
+	p = sol.n + N + 1;
+	i = sol.n[N];
+
+	do {
+		if (X(sol.s, *p) > 1) {
+			for (j = 0; j < X(sol.s, *p); j++) {
+				minc[*p] = min(minc[*p], ccount[sol.cs[Y(sol.s, *p) + j]]);
+				maxc[*p] = max(maxc[*p], ccount[sol.cs[Y(sol.s, *p) + j]]);
+				minp[*p] = min(minp[*p], x[sol.cs[Y(sol.s, *p) + j]]);
+				maxp[*p] = max(maxp[*p], x[sol.cs[Y(sol.s, *p) + j]]);
+			}
+		}
+		p++;
+	} while (--i);
+
+	double r[2 * N];
+
+	for (i = 0; i < N; i++)
+		if (X(sol.s, ai[i]) > 1) {
+			X(r, i) = ((double)ccount[i] - minc[ai[i]]) / (maxc[ai[i]] - minc[ai[i]]);
+			Y(r, i) = (double)(x[i] - minp[ai[i]]) / (maxp[ai[i]] - minp[ai[i]]);
+		}
+
+	for (i = 0; i < N; i++) if (X(sol.s, ai[i]) > 1 && maxp[ai[i]] != minp[ai[i]]) printf("%f,%f\n", X(r, i), Y(r, i));
 
 	free(ai);
 	free(l);

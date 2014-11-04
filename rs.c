@@ -2,6 +2,7 @@
 
 uint64_t count;
 static uint64_t split[E];
+static uint64_t ccount[N];
 
 penny opt;
 static stack sol;
@@ -279,12 +280,13 @@ void printcsordered(const agent *s, const agent *cs, const agent *n) {
 
 #ifdef GRAPHVIZ
 
+#include "graphviz/gvc.h"
+
 static char* names[] = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", \
 			 "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "26", "28", "29", "30" };
 
 void graph2png(const agent *a, const agent *n, const contr c, const contr r, const contr d, const char* filename) {
 
-	#include "graphviz/gvc.h"
 	register const agent *p = n + N + 1;
 	register agent i, m = n[N];
 	GVC_t *gvc = gvContext();
@@ -853,7 +855,7 @@ int main(int argc, char *argv[]) {
 		st[0].n[st[0].n[i] = N + i + 1] = i;
 	}
 
-	penny in = opt;
+	//penny in = opt;
 	init(SEED);
 	//createScaleFree(st[0].g, st[0].a);
 	memcpy(st[0].g, g, sizeof(edge) * N * N);
@@ -886,17 +888,14 @@ int main(int argc, char *argv[]) {
 	sol = st[0];
 	edgecontraction(st, 0, c, r, d, opt, sp, NULL);
 	size_t maxc = split[0];
-
 	for (i = 1; i < E; i++) maxc = split[i] > maxc ? split[i] : maxc;
-
-	payoff x[N];
 	//printcs(sol.s, sol.cs, sol.n, sol.dr, sol.l);
+	payoff x[N];
 	gettimeofday(&t1, NULL);
 	if (sol.n[N] != N) i = computekernel(x, EPSILON, st[0].a, st[0].dr, sp);
 	gettimeofday(&t2, NULL);
-	printf("%u,%u,%u,%u,%llu,%u,%u,%zu,%zu,%u,%f\n", N, sol.n[N], D, MINGAIN, SEED, in, opt,\
-	count, maxc, i, (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
-	//for (i = 0; i < N; i++) printf("%u: %u %f\n", i, COST(i, st[0].dr, st[0].l), -x[i]);
+	//double dt = (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec;
+	//printf("%u,%u,%u,%u,%llu,%u,%u,%zu,%zu,%u,%f\n", N, sol.n[N], D, MINGAIN, SEED, in, opt, count, maxc, i, dt);
 
 	/*
 	printf("Total cost with ridesharing = %.2f£\n", POUND(opt));

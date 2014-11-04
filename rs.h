@@ -26,7 +26,7 @@
 //#define DRIVERPERC 10
 //#define MINGAIN 1
 #define MAXDRIVERS 1
-#define EPSILON 0.1
+#define EPSILON 0.05
 
 #define REORDER
 //#define PARALLEL
