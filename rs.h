@@ -23,18 +23,22 @@
 #define TICKETCOST 300
 #define PENNYPERLITRE 130
 #define METERSPERLITRE 15000
-//#define DRIVERPERC 10
-//#define MINGAIN 1
 #define MAXDRIVERS 1
 #define EPSILON 0.05
+#define K 2
 
 #define REORDER
+#define TWITTER
 //#define PARALLEL
 //#define NAIVE
 
-//#define SEED 45688ULL
-//#define N 20
-#define K 2
+#ifndef TWITTER
+#define N 25
+#define E (K * N - (K * (K + 1)) / 2)
+#define DRIVERPERC 10
+#define MINGAIN 1
+#define SEED 4568ULL
+#endif
 
 #ifdef METIS
 #define ROUTINE METIS_PartGraphKway
@@ -50,7 +54,6 @@
 #endif
 
 #define D (N * DRIVERPERC / 100)
-//#define E (K * N - (K * (K + 1)) / 2)
 #define R (1 + (((E > N ? E : N) - 1) / 128))
 
 #define MEAN(x, y) (((x) + (y)) / 2)

@@ -857,9 +857,12 @@ int main(int argc, char *argv[]) {
 
 	//penny in = opt;
 	init(SEED);
-	//createScaleFree(st[0].g, st[0].a);
+	#ifdef TWITTER
 	memcpy(st[0].g, g, sizeof(edge) * N * N);
 	memcpy(st[0].a, a, sizeof(agent) * 2 * (E + 1));
+	#else
+	createScaleFree(st[0].g, st[0].a);
+	#endif
 
 	#ifdef REORDER
 	edge go[N * N] = {0};

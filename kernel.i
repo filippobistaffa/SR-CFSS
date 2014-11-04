@@ -534,11 +534,11 @@ agent computekernel(payoff *x, payoff epsilon, const agent *a, const agent *dr, 
 
 	for (i = 0; i < N; i++)
 		if (X(sol.s, ai[i]) > 1) {
-			X(r, i) = ((double)ccount[i] - minc[ai[i]]) / (maxc[ai[i]] - minc[ai[i]]);
-			Y(r, i) = (double)(x[i] - minp[ai[i]]) / (maxp[ai[i]] - minp[ai[i]]);
+			X(r, i) = maxc[ai[i]] == minc[ai[i]] ? 0.5 : ((double)ccount[i] - minc[ai[i]]) / (maxc[ai[i]] - minc[ai[i]]);
+			Y(r, i) = maxp[ai[i]] == minp[ai[i]] ? 0.5 : ((double)x[i] - minp[ai[ i]]) / (maxp[ai[i]] - minp[ai[i]]);
 		}
 
-	for (i = 0; i < N; i++) if (X(sol.s, ai[i]) > 1 && maxp[ai[i]] != minp[ai[i]]) printf("%f,%f\n", X(r, i), Y(r, i));
+	for (i = 0; i < N; i++) if (X(sol.s, ai[i]) > 1) printf("%f,%f\n", X(r, i), Y(r, i));
 
 	free(ai);
 	free(l);
