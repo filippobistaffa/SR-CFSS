@@ -23,18 +23,22 @@
 #define TICKETCOST 300
 #define PENNYPERLITRE 130
 #define METERSPERLITRE 15000
-//#define DRIVERPERC 20
 #define MINGAIN 1
 #define MAXDRIVERS 1
-//#define LIMIT 100
 #define EPSILON 0.1
+#define K 2
 
 #define REORDER
-//#define PARALLEL
+#define PARALLEL
+#define TWITTER
 
-//#define SEED 9872124ULL
-//#define N 100
-#define K 2
+#ifndef TWITTER
+#define N 100
+#define E (K * N - (K * (K + 1)) / 2)
+#define DRIVERPERC 20
+#define LIMIT 100
+#define SEED 9872124ULL
+#endif
 
 #ifdef METIS
 #define ROUTINE METIS_PartGraphKway
@@ -48,7 +52,6 @@
 #endif
 
 #define D (N * DRIVERPERC / 100)
-//#define E (K * N - (K * (K + 1)) / 2)
 #define R (1 + (((E > N ? E : N) - 1) / 128))
 
 #define MEAN(x, y) (((x) + (y)) / 2)
@@ -80,7 +83,6 @@ typedef struct __attribute__((aligned(128))) {
 	agent a[2 * (E + 1)], n[2 * N + 1];
 	agent s[2 * N], cs[N], dr[N];
 	meter l[N];
-	//meter sd[2 * N];
 } stack;
 
 #include "crc32.h"
