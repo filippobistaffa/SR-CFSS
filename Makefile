@@ -1,8 +1,8 @@
 .PHONY:
 
 CMP=g++
-OPT=-Wall -Ofast -march=native -funroll-loops -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 -Wno-psabi
-DBG=-Wall -O0 -g
+OPT=-Wall -Ofast -march=native -funroll-loops -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 -Wno-psabi -fopenmp
+DBG=-Wall -O0 -g -fopenmp
 NOOPT=-Wall -O0 -march=native -Wno-psabi -fopenmp
 OUT=./rs
 
