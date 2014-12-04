@@ -2,12 +2,17 @@
 
 uint64_t count;
 static uint64_t split[E];
-static uint64_t ccount[N];
+//static uint64_t ccount[N];
+
 
 penny opt;
 static stack sol;
 struct timeval t1, t2;
 static agent csg[N], sg[2 * N];
+timepreference tpstart[N], tpstop[N];
+
+struct tm day = { .tm_year=2014, .tm_mon=10, .tm_mday=25, .tm_hour=0, .tm_min=0, .tm_sec=0};
+time_t timezero = mktime(&day);
 
 /*void printpath(agent *q, agent *s, agent *p) {
 
@@ -134,12 +139,14 @@ void minsse(meter *b, agent n) {
 	*b = tmp[0];
 }
 
+
 __attribute__((always_inline)) inline
 meter minpath(agent *c, agent n, agent dr, const meter *sp) {
 
 	meter r[R5];
 	register agent t, i = 1;
 	register meter min = UINT_MAX;
+
 
 	do {
 		switch (n) {
@@ -163,6 +170,7 @@ meter minpath(agent *c, agent n, agent dr, const meter *sp) {
 				break;
 		}
 
+
 		if (r[0] < min) min = r[0];
 
 		if (dr != 1) {
@@ -173,6 +181,288 @@ meter minpath(agent *c, agent n, agent dr, const meter *sp) {
 	} while (--dr);
 
 	return min;
+}
+
+char* gettime (time_t t){
+	char *buffer = (char *)malloc(sizeof(char) * 6);
+	strftime (buffer,6,"%H:%M",localtime(&t));
+	return buffer;
+}
+
+#define DIFF(t1,t2) (t1-t2)
+#define GETTIMEPREFERENCE(agentindex) (agentindex % 2 == 0 ? tpstart[agentindex/2]: tpstop[(agentindex-1)/2])
+#define MIN(a,b) (a<b?a:b)
+#define MAX(a,b) (a>b?a:b)
+
+penny _old_bestpath(agent *c, agent n, agent dr, const meter *sp, meter *r, agent pp[][10], int k, meter *pathlegth, second *waitingtime, int printpath = 0) {
+
+	register agent t, i = 1;
+	register penny min = INFINITE, cost;
+	register time_t startingtime, endingtime, current, outst;
+	register timepreference tp;
+	register second sum;
+	register int v;
+	register char feasible;
+	register int bestpath;
+
+	do {
+		//for all feasible paths
+		for (int path = 0; path < k; path++) {
+			//for all starting times
+			startingtime = tpstart[c[0]].idealtime - tpstart[c[0]].maxbefore;
+			endingtime = tpstart[c[0]].idealtime + tpstart[c[0]].maxafter;
+			for (; startingtime <= endingtime; startingtime += (60 * 15)) {
+				current = startingtime;
+				sum = abs(DIFF(current, GETTIMEPREFERENCE(pp[path][0]).idealtime));
+				feasible = 1;
+				for (int j = 0; j < 2 * n - 1; j++) {
+					current += TRAVELTIME(sp[(pp[path][j])*2*N+(pp[path][j+1])]);
+					tp = GETTIMEPREFERENCE(pp[path][j + 1]);
+					v = DIFF(current, tp.idealtime);
+					//if v is out of range then the path with this starting time is not feasible
+					if ((v > 0 && v > tp.maxafter) || (v < 0 && abs(v) > tp.maxbefore)) {
+						feasible = 0;
+						break;
+					}
+					sum += abs(v);
+				}
+				if (feasible) {
+					cost = PATHCOST(r[path]) + CARCOST + COSTTIME(sum);
+					if (cost < min) {
+						min = cost;
+						*pathlegth = r[path];
+						*waitingtime = sum;
+						outst = startingtime; //used only for output
+						bestpath = path; //used only for output
+					}
+				}
+			}
+
+		}
+
+		if (dr != 1) {
+			t = c[0];
+			c[0] = c[i];
+			c[i++] = t;
+		}
+	} while (--dr);
+
+	//start output
+	if (printpath) {
+		/*printf("c= ");
+		 for (i = 0; i < n; i++) {
+		 printf("%d ,",c[i]);
+		 }*/
+		if (min != INFINITE) {
+			//printf("\tcost= %.2f\t path=%d\t wait=%s\t start=%s\n",POUND(min),*pathlegth,gettime(*waitingtime+timezero),gettime(outst));
+
+			for (int j = 0; j < 2 * n; j++)
+				printf("%d%s\t->\t", pp[bestpath][j] / 2, pp[bestpath][j] % 2 ? "e" : "s");
+			printf("\n");
+
+			current = outst;
+			v = DIFF(current, GETTIMEPREFERENCE(pp[bestpath][0]).idealtime);
+			printf("%s(%s%s)\t", gettime(current), v > 0 ? "+" : "-", gettime(timezero + abs(v)));
+			for (int j = 0; j < 2 * n - 1; j++) {
+				current += TRAVELTIME(sp[(pp[bestpath][j])*2*N+(pp[bestpath][j+1])]);
+				tp = GETTIMEPREFERENCE(pp[bestpath][j + 1]);
+				v = DIFF(current, tp.idealtime);
+				printf("%s(%s%s)\t", gettime(current), v > 0 ? "+" : "-", gettime(timezero + abs(v)));
+			}
+			printf("\n");
+
+		} else
+			printf("infeasible\n");
+	}
+	//end output
+
+	return min;
+}
+
+penny bestpath(agent *c, agent n, agent dr, const meter *sp, meter *r, agent pp[][10], int k, meter *pathlegth, second *waitingtime, int printpath = 0) {
+
+	register agent t, i = 1;
+	register penny min = INFINITE, cost;
+	time_t startingtime, current, outst;
+	register timepreference tp;
+	register second sum;
+	register int v;
+	char feasible;
+	int bestpath;
+	static int diffs[10];
+	register int positives, negatives, zeroes, lwpositive, grnegative;
+	register int cananticipateof, canpostponeof, shift;
+
+	do {
+		//for all feasible paths
+		for (int path = 0; path < k; path++) {
+
+			startingtime = tpstart[c[0]].idealtime;
+			current = startingtime;
+			diffs[0] = 0;
+			cananticipateof = -tpstart[c[0]].maxbefore;
+			canpostponeof = tpstart[c[0]].maxafter;
+			positives = negatives = 0;
+			zeroes = 1;
+			lwpositive = INT_MAX;
+			grnegative = INT_MIN;
+
+			sum = 0;
+			feasible = 1;
+
+			//for all points of the path compute diffs among ideal time and real time
+			for (int j = 1; j < 2 * n; j++) {
+				current += TRAVELTIME(sp[(pp[path][j-1])*2*N+(pp[path][j])]);
+				tp = GETTIMEPREFERENCE(pp[path][j]);
+				v = DIFF(current, tp.idealtime);
+				diffs[j] = v;
+				cananticipateof = MAX(cananticipateof, (-tp.maxbefore - v));
+				canpostponeof = MIN(canpostponeof, (tp.maxafter - v));
+
+				if (v > 0) {
+					positives++;
+					lwpositive = MIN(lwpositive, v);
+				} else if (v < 0) {
+					negatives++;
+					grnegative = MAX(grnegative, v);
+				} else
+					zeroes++;
+
+				sum += abs(v);
+			}
+
+			//find the optimal starting point
+			do {
+				shift = 0;
+				if (canpostponeof < 0) { //there is some agent out of range right side
+					if (canpostponeof < cananticipateof)
+						feasible = 0;
+					else
+						shift = canpostponeof;
+				} else if (cananticipateof > 0) { //there is some agent out of range left side
+					if (canpostponeof < cananticipateof)
+						feasible = 0;
+					else
+						shift = cananticipateof;
+				} else {
+					if (positives > (negatives + zeroes) && cananticipateof < 0) {
+						shift = -MIN(lwpositive, -cananticipateof);
+					} else if (negatives > (positives + zeroes) && canpostponeof > 0) {
+						shift = MIN(-grnegative, canpostponeof);
+					}
+				}
+
+				if (shift) {
+					cananticipateof -= shift;
+					canpostponeof -= shift;
+					positives = negatives = zeroes = sum = 0;
+					lwpositive = INT_MAX;
+					grnegative = INT_MIN;
+					startingtime += shift;
+
+					for (int j = 0; j < 2 * n; j++) {
+						diffs[j] += shift;
+						v = diffs[j];
+
+						if (v > 0) {
+							positives++;
+							lwpositive = MIN(lwpositive, v);
+						} else if (v < 0) {
+							negatives++;
+							grnegative = MAX(grnegative, v);
+						} else
+							zeroes++;
+
+						sum += abs(v);
+					}
+				}
+			} while (shift);
+
+			if (feasible) {
+				cost = PATHCOST(r[path]) + CARCOST + COSTTIME(sum);
+				if (cost < min) {
+					min = cost;
+					*pathlegth = r[path];
+					*waitingtime = sum;
+					outst = startingtime; //used only for output
+					bestpath = path; //used only for output
+				}
+			}
+
+		}
+
+		if (dr != 1) {
+			t = c[0];
+			c[0] = c[i];
+			c[i++] = t;
+		}
+	} while (--dr);
+
+	//start output
+	if (printpath) {
+		/*printf("c= ");
+		 for (i = 0; i < n; i++) {
+		 printf("%d ,",c[i]);
+		 }*/
+		if (min != INFINITE) {
+			//printf("\tcost= %.2f\t path=%d\t wait=%s\t start=%s\n",POUND(min),*pathlegth,gettime(*waitingtime+timezero),gettime(outst));
+
+			for (int j = 0; j < 2 * n; j++)
+				printf("%d%s\t->\t", pp[bestpath][j] / 2, pp[bestpath][j] % 2 ? "e" : "s");
+			printf("\n");
+
+			current = outst;
+			v = DIFF(current, GETTIMEPREFERENCE(pp[bestpath][0]).idealtime);
+			printf("%s(%s%s)\t", gettime(current), v > 0 ? "+" : "-", gettime(timezero + abs(v)));
+			for (int j = 0; j < 2 * n - 1; j++) {
+				current += TRAVELTIME(sp[(pp[bestpath][j])*2*N+(pp[bestpath][j+1])]);
+				tp = GETTIMEPREFERENCE(pp[bestpath][j + 1]);
+				v = DIFF(current, tp.idealtime);
+				printf("%s(%s%s)\t", gettime(current), v > 0 ? "+" : "-", gettime(timezero + abs(v)));
+			}
+			printf("\n");
+
+		} else
+			printf("infeasible\n");
+	}
+	//end output
+
+	return min;
+}
+
+
+penny bestpath(agent *c, agent n, agent dr, const meter *sp, meter *pathlegth, second *waitingtime,int printpath=0) {
+	meter r[R5];
+
+	if(n==5){
+		#include "paths5.h"
+		#include "path5points.h"
+		return bestpath(c,n,dr,sp,r,pathpoints,R5,pathlegth,waitingtime,printpath);
+	}
+
+	if(n==4){
+		#include "paths4.h"
+		#include "path4points.h"
+		return bestpath(c,n,dr,sp,r,pathpoints,R4,pathlegth,waitingtime,printpath);
+	}
+
+	if(n==3){
+		#include "paths3.h"
+		#include "path3points.h"
+		return bestpath(c,n,dr,sp,r,pathpoints,R3,pathlegth,waitingtime,printpath);
+	}
+
+	if(n==2){
+		#include "paths2.h"
+		#include "path2points.h"
+		return bestpath(c,n,dr,sp,r,pathpoints,1,pathlegth,waitingtime,printpath);
+	}
+
+	#include "paths1.h"
+	#include "path1points.h"
+	return bestpath(c,n,dr,sp,r,pathpoints,1,pathlegth,waitingtime,printpath);
+
+
 }
 
 __attribute__((always_inline)) inline
@@ -276,6 +566,35 @@ void printcsordered(const agent *s, const agent *cs, const agent *n) {
 		printf("} ");
 	}
 	puts("");
+}
+
+void printcs(const agent *s, const agent *cs, const agent *n, const agent *dr, const meter *l, const second *w) {
+
+	register const agent *p = n + N + 1;
+        register agent i, j, m = n[N];
+
+	do {
+		i = *(p++);
+                printf("{ ");
+                for (j = 0; j < X(s, i); j++)
+                	printf("%s%u%s%s ", i == cs[Y(s, i) + j] ? "<" : "", cs[Y(s, i) + j], i == cs[Y(s, i) + j] ? ">" : "", j < dr[i] ? "*" : "");
+                printf("} (%um + %ds %s) = %.2f£\n", l[i], w[i], gettime((time_t)(w[i]+timezero)), POUND(COST(i, dr, l)+COSTTIME(w[i])));
+        } while (--m);
+}
+
+void printcsshort(const agent *s, const agent *cs, const agent *n, const agent *dr, const meter *l) {
+
+	register const agent *p = n + N + 1;
+        register agent i, j, m = n[N];
+
+	do {
+		i = *(p++);
+                printf("{ ");
+                for (j = 0; j < X(s, i); j++)
+                	printf("%s%u%s%s ", i == cs[Y(s, i) + j] ? "<" : "", cs[Y(s, i) + j], i == cs[Y(s, i) + j] ? ">" : "", j < dr[i] ? "*" : "");
+                printf("} ");
+        } while (--m);
+	printf("\n");
 }
 
 #ifdef GRAPHVIZ
@@ -444,17 +763,19 @@ penny bound(const agent *a, const agent *n, const contr c, const contr r, const 
 	return b;
 }
 
+
 void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, const meter *sp, uint64_t *cnt) {
 
 	count++;
 	stack cur = *st;
 	if (cnt) (*cnt)++;
 	if (tot < opt) { sol = cur; opt = tot; }
-	if (bound(cur.a, cur.n, c, r, d, cur.s, cur.cs, cur.dr, cur.l, sp) >= opt - MINGAIN) return;
+	//fra//if (bound(cur.a, cur.n, c, r, d, cur.s, cur.cs, cur.dr, cur.l, sp) >= opt - MINGAIN) return;
 
 	__m128i h[R], rt[R];
 	register edge f, j;
 	register agent v1, v2;
+	register penny newtot;
 
 	for (f = 1; f < E + 1; f++)
 		if (!ISSET(c, f) && !ISSET(r, f) && !ISSET(d, f)) {
@@ -466,11 +787,47 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 			for (j = 0; j < R; j++) h[j] = _mm_setzero_si128();
 			merge(v1, v2, st[1].n, st[1].s, st[1].cs, st[1].dr);
 			contract(st[1].g, st[1].a, st[1].n, v1, v2, rt, h);
-			st[1].l[v1] = minpath(st[1].cs + Y(st[1].s, v1), X(st[1].s, v1), st[1].dr[v1], sp);
+
+			//fra//st[1].l[v1] = minpath(st[1].cs + Y(st[1].s, v1), X(st[1].s, v1), st[1].dr[v1], sp);
+			//tmp
+
+			//printf("cs = %llu f=%d ",cnt?*cnt:0,f);
+			//printcsshort(cur.s, cur.cs, cur.n, cur.dr, cur.l);
+			//printf("prima costa=%d\n",tot);
+
+
+			st[1].cost[v1] = bestpath(st[1].cs + Y(st[1].s, v1), X(st[1].s, v1), st[1].dr[v1], sp, &st[1].l[v1], &st[1].wait[v1]);
+
+			newtot=0;
+			if(st[1].cost[v1] == INFINITE)
+				newtot = INFINITE;
+			else
+				if(tot != INFINITE)
+					newtot = tot - cur.cost[v1] - cur.cost[v2] + st[1].cost[v1];
+				else{
+						register const agent *p = st[1].n + N + 1;
+						register agent i, m = st[1].n[N];
+
+						do {
+							i = *(p++);
+							if(st[1].cost[i]==INFINITE){newtot=INFINITE; break;}
+							newtot += st[1].cost[i];
+						} while (--m);
+				}
+
+
+			//printcsshort(st[1].s, st[1].cs, st[1].n, st[1].dr, st[1].l);
+			//printf("dopo costa=%d\n\n",newtot);
+
+			//end tmp
+
 			SET(c, f);
 			OR(d, h);
-			edgecontraction(st + 1, f, c, rt, d, tot + COST(v1, st[1].dr, st[1].l) - COST(v1, cur.dr, cur.l) - COST(v2, cur.dr, cur.l), \
-			sp, cnt ? cnt : split + f - 1);
+
+			edgecontraction(st + 1, f, c, rt, d, \
+					newtot, \
+					sp, cnt ? cnt : split + f - 1);
+
 			CLEAR(c, f);
 			ANDNOT(d, h);
 		}
@@ -752,7 +1109,9 @@ void createScaleFree(edge *g, agent *a) {
 	}
 }
 
-#include "kernel.i"
+
+
+//#include "kernel.i"
 
 int main(int argc, char *argv[]) {
 
@@ -792,7 +1151,7 @@ int main(int argc, char *argv[]) {
 	fread(adj, sizeof(place), 2 * edges + nodes, f);
 	fclose(f);
 
-	//printf("%u nodes, %u edges\n", nodes, edges);
+	printf("%u nodes, %u edges\n", nodes, edges);
 
 	// adjaciency indexes
 
@@ -805,7 +1164,7 @@ int main(int argc, char *argv[]) {
 
 	f = fopen(SS, "rb");
 	fread(&pool, sizeof(uint16_t), 1, f);
-	//printf("%u possible agents, choosing %u\n", pool, N);
+	printf("%u possible agents, choosing %u\n", pool, N);
 
 	place *stops = (place *)malloc(sizeof(place) * 2 * pool);
 	fread(stops, sizeof(place), 2 * pool, f);
@@ -839,6 +1198,24 @@ int main(int argc, char *argv[]) {
 	free(ds);
 	free(adj);
 
+
+
+
+
+
+	init(SEED);
+	for (i = 0; i < N; i++) {
+		tpstart[i].idealtime = timezero + 10*3600 + 3600*nextInt(6);
+		tpstart[i].maxafter = tpstart[i].maxbefore = 1*3600;
+
+		tpstop[i].idealtime = tpstart[i].idealtime + TRAVELTIME(sp[4 * i * N + 2 * i + 1]);
+		tpstop[i].maxafter = tpstop[i].maxbefore = 1*3600;
+
+		printf("agent %2d\t start %s",i,gettime(tpstart[i].idealtime));
+		printf("\t stop %s\t duration %lds\t length path %dm\n",gettime(tpstop[i].idealtime),tpstop[i].idealtime-tpstart[i].idealtime,sp[4 * i * N + 2 * i + 1]);
+	}
+
+
 	stack st[N];
 	memset(st[0].g, 0, sizeof(edge) * N * N);
 
@@ -851,8 +1228,10 @@ int main(int argc, char *argv[]) {
 		X(sg, i) = X(st[0].s, i) = 1;
 		Y(sg, i) = Y(st[0].s, i) = csg[i] = st[0].cs[i] = i;
 		st[0].l[i] = sp[4 * i * N + 2 * i + 1];
-		opt += COST(i, st[0].dr, st[0].l);
 		st[0].n[st[0].n[i] = N + i + 1] = i;
+		st[0].wait[i]=0;
+		st[0].cost[i] = COST(i, st[0].dr, st[0].l);
+		opt += st[0].cost[i];
 	}
 
 	//penny in = opt;
@@ -890,21 +1269,35 @@ int main(int argc, char *argv[]) {
 
 	sol = st[0];
 	edgecontraction(st, 0, c, r, d, opt, sp, NULL);
+
 	size_t maxc = split[0];
 	for (i = 1; i < E; i++) maxc = split[i] > maxc ? split[i] : maxc;
-	//printcs(sol.s, sol.cs, sol.n, sol.dr, sol.l);
-	payoff x[N];
+
+
+	printcs(sol.s, sol.cs, sol.n, sol.dr, sol.l, sol.wait);
+	//payoff x[N];
 	gettimeofday(&t1, NULL);
-	if (sol.n[N] != N) i = computekernel(x, EPSILON, st[0].a, st[0].dr, sp);
+	//if (sol.n[N] != N) i = computekernel(x, EPSILON, st[0].a, st[0].dr, sp);
 	gettimeofday(&t2, NULL);
 	//double dt = (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec;
 	//printf("%u,%u,%u,%u,%llu,%u,%u,%zu,%zu,%u,%f\n", N, sol.n[N], D, MINGAIN, SEED, in, opt, count, maxc, i, dt);
 
-	/*
 	printf("Total cost with ridesharing = %.2f£\n", POUND(opt));
-	printf("%zu CSs\n", count);
 
-	for (i = 0; i < E; i++)
+	//print detail paths
+	printf("\n");
+	const agent *p = sol.n + N + 1;
+	agent clsndr;
+	for (i = 0; i < sol.n[N]; i++){
+		clsndr = *(p++);
+		if(sol.dr[clsndr])
+			bestpath(sol.cs + Y(sol.s, clsndr), X(sol.s, clsndr), sol.dr[clsndr], sp, &sol.l[clsndr], &sol.wait[clsndr], 1);
+	}
+
+
+	//printf("%zu CSs\n", count);
+
+	/*for (i = 0; i < E; i++)
 		if (split[i]) printf("%zu CSs (%.2f%%)\n", split[i], (double)split[i] * 100 / (count - 1));
 
 	puts("Gains:");

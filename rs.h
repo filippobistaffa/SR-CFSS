@@ -1,7 +1,7 @@
 #define CAR 5
 #define SEATS (CAR - 1)
 
-#include <omp.h>
+//#include <omp.h>
 #include <math.h>
 #include <stdio.h>
 #include <limits.h>
@@ -9,6 +9,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include "types.h"
+#include <time.h>
 
 #define IDX "idx.dat"
 #define ADJ "adj.dat"
@@ -20,7 +21,7 @@
 #define R3 6
 
 #define CARCOST 100
-#define TICKETCOST 300
+#define TICKETCOST 500
 #define PENNYPERLITRE 130
 #define METERSPERLITRE 15000
 #define MAXDRIVERS 1
@@ -28,16 +29,16 @@
 #define K 2
 
 #define REORDER
-#define TWITTER
+//#define TWITTER
 //#define PARALLEL
 //#define NAIVE
 
 #ifndef TWITTER
-#define N 25
+#define N 15
 #define E (K * N - (K * (K + 1)) / 2)
-#define DRIVERPERC 10
+#define DRIVERPERC 40
 #define MINGAIN 1
-#define SEED 4568ULL
+#define SEED 4646ULL//45345ULL //91284ULL//
 #endif
 
 #ifdef METIS
@@ -65,6 +66,11 @@
 #define X(v, i) ((v)[2 * (i)])
 #define Y(v, i) ((v)[2 * (i) + 1])
 
+#define SPEED (50/3.6) //50kmh
+#define TRAVELTIME(p) (int)(p/SPEED)
+#define COSTTIME(s) ROUND(penny, (float)(s) / 3600 * 200)
+#define INFINITE UINT16_MAX
+
 #define OR(x, y) ({ register uint_fast8_t i; for (i = 0; i < R; i++) x[i] = _mm_or_si128(x[i], y[i]); })
 #define ANDNOT(x, y) ({ register uint_fast8_t i; for (i = 0; i < R; i++) x[i] = _mm_andnot_si128(y[i], x[i]); })
 #define ISSET(x, i) ((_mm_cvtsi128_si64(((i) >> 6) & 1 ? _mm_srli_si128(x[(i) >> 7], 8) : x[(i) >> 7]) >> ((i) & 63)) & 1)
@@ -85,7 +91,16 @@ typedef struct __attribute__((aligned(128))) {
 	agent a[2 * (E + 1)], n[2 * N + 1];
 	agent s[2 * N], cs[N], dr[N];
 	meter l[N];
+	second wait[N];
+	penny cost[N];
 } stack;
+
+typedef struct {
+	time_t idealtime;
+	int maxbefore;
+	int maxafter;
+} timepreference;
+
 
 //#include "crc32.h"
 #include "random.h"
