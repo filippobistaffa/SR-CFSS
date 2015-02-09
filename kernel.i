@@ -461,7 +461,7 @@ size_t creatematrixdslyce(payoff *sm, const payoff *x, const agent *l, const age
         return ret;
 }
 
-agent computekernel(payoff *x, payoff epsilon, const agent *a, const agent *dr, const meter *sp) {
+agent computekernel(payoff *x, payoff epsilon, const agent *a, const agent *dr, const meter *sp, const place *adj, const id *idx) {
 
 	filltables();
 	register agent *ai = (agent *)malloc(sizeof(agent) * N);
@@ -505,12 +505,15 @@ agent computekernel(payoff *x, payoff epsilon, const agent *a, const agent *dr, 
 
 	} while (d / opt > epsilon);
 
-	size_t minc[N], maxc[N];
+	agent mind[N], maxd[N];
+	//size_t minc[N], maxc[N];
 	payoff minp[N], maxp[N];
 
 	for (i = 0; i < N; i++) {
-		minc[i] = UINTMAX_MAX;
-		maxc[i] = 0;
+		//minc[i] = UINTMAX_MAX;
+		//maxc[i] = 0;
+		mind[i] = UINT16_MAX;
+		maxd[i] = 0;
 		minp[i] = INFINITY;
 		maxp[i] = -INFINITY;
 	}
@@ -521,8 +524,10 @@ agent computekernel(payoff *x, payoff epsilon, const agent *a, const agent *dr, 
 	do {
 		if (X(sol.s, *p) > 1) {
 			for (j = 0; j < X(sol.s, *p); j++) {
-				minc[*p] = min(minc[*p], ccount[sol.cs[Y(sol.s, *p) + j]]);
-				maxc[*p] = max(maxc[*p], ccount[sol.cs[Y(sol.s, *p) + j]]);
+				//minc[*p] = min(minc[*p], ccount[sol.cs[Y(sol.s, *p) + j]]);
+				//maxc[*p] = max(maxc[*p], ccount[sol.cs[Y(sol.s, *p) + j]]);
+				mind[*p] = min(mind[*p], adj[idx[sol.cs[Y(sol.s, *p) + j]]]);
+				maxd[*p] = max(maxd[*p], adj[idx[sol.cs[Y(sol.s, *p) + j]]]);
 				minp[*p] = min(minp[*p], x[sol.cs[Y(sol.s, *p) + j]]);
 				maxp[*p] = max(maxp[*p], x[sol.cs[Y(sol.s, *p) + j]]);
 			}
@@ -534,11 +539,12 @@ agent computekernel(payoff *x, payoff epsilon, const agent *a, const agent *dr, 
 
 	for (i = 0; i < N; i++)
 		if (X(sol.s, ai[i]) > 1) {
-			X(r, i) = maxc[ai[i]] == minc[ai[i]] ? 0.5 : ((double)ccount[i] - minc[ai[i]]) / (maxc[ai[i]] - minc[ai[i]]);
+			//X(r, i) = maxc[ai[i]] == minc[ai[i]] ? 0.5 : ((double)ccount[i] - minc[ai[i]]) / (maxc[ai[i]] - minc[ai[i]]);
+			X(r, i) = maxd[ai[i]] == mind[ai[i]] ? 0.5 : ((double)adj[idx[i]] - mind[ai[i]]) / (maxd[ai[i]] - mind[ai[i]]);
 			Y(r, i) = maxp[ai[i]] == minp[ai[i]] ? 0.5 : ((double)x[i] - minp[ai[ i]]) / (maxp[ai[i]] - minp[ai[i]]);
 		}
 
-	for (i = 0; i < N; i++) if (X(sol.s, ai[i]) > 1) printf("%f,%f\n", X(r, i), Y(r, i));
+	for (i = 0; i < N; i++) if (X(sol.s, ai[i]) > 1) printf("%u,%u,%u,%f,%f\n", i, adj[idx[i]], dr[i], X(r, i), Y(r, i));
 
 	free(ai);
 	free(l);
