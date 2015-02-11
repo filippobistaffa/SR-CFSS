@@ -895,7 +895,13 @@ int main(int argc, char *argv[]) {
 	//printcs(sol.s, sol.cs, sol.n, sol.dr, sol.l);
 	payoff x[N];
 	gettimeofday(&t1, NULL);
-	if (sol.n[N] != N) i = computekernel(x, EPSILON, st[0].a, st[0].dr, sp, adj, idx);
+	agent deg[N] = { 0 };
+
+	for (i = 0; i < N; i++)
+		for (j = i + 1; j < N; j++)
+			if (st[0].g[i * N + j]) { deg[i]++; deg[j]++; }
+
+	if (sol.n[N] != N) i = computekernel(x, EPSILON, st[0].a, st[0].dr, sp, deg);
 	gettimeofday(&t2, NULL);
 	//double dt = (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec;
 	//printf("%u,%u,%u,%u,%llu,%u,%u,%zu,%zu,%u,%f\n", N, sol.n[N], D, MINGAIN, SEED, in, opt, count, maxc, i, dt);
