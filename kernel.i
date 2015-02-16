@@ -498,7 +498,7 @@ agent computekernel(payoff *x, payoff epsilon, const agent *a, const agent *dr, 
 				if (t > d) { d = t; mi = i; mj = j; }
 			}
 
-		vmj = drg[mj] ? PATHCOST(sp[2 * mj * 2 * N + 2 * mj + 1]) : TICKETCOST;
+		vmj = drg[mj] ? (PATHCOST(sp[2 * mj * 2 * N + 2 * mj + 1]) + CARCOST) : TICKETCOST;
 		if ((e = x[mj] + vmj) >= d / 2) e = d / 2;
 		x[mi] += e;
 		x[mj] -= e;
