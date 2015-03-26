@@ -95,7 +95,7 @@ void printc(const agent *c, payoff v) {
 
 	register agent n = *c;
 	printf("{ ");
-	while (n--) printf("%u ", *(++c));
+	while (n--) printf("%llu ", *(++c));
 	printf("} = %f\n", v);
 }
 
@@ -247,7 +247,8 @@ void coalition(agent *c, payoff *sm, const payoff *x, const agent *s, const agen
 
 	agent nc[N];
 	register agent i, j, *t, *oc = c;
-	register payoff vc = d ? (PATHCOST(minpath(c + 1, *c, 1, sp)) + CARCOST) : TICKETCOST;
+	//register payoff vc = d ? (PATHCOST(minpath(c + 1, *c, 1, sp)) + CARCOST) : TICKETCOST;
+	register payoff vc = d ? bestpath(c + 1, *c, 1, sp,NULL,NULL) : TICKETCOST;
 	register payoff vmx = vc + vectorsum<payoff>(c + 1, *c, x);
 
 	if ((i = *(c++))) do {
@@ -427,7 +428,7 @@ size_t creatematrix(payoff *sm, const payoff *x, const agent *l, const agent *s,
 	free(r);
 	return ret;
 }
-
+/*
 __attribute__((always_inline)) inline
 size_t creatematrixdslyce(payoff *sm, const payoff *x, const agent *l, const agent *s, const agent *cs, const agent *ai, const meter *sp) {
 
@@ -460,8 +461,8 @@ size_t creatematrixdslyce(payoff *sm, const payoff *x, const agent *l, const age
         for (i = 0; i < t; i++) ret += c[i];
         return ret;
 }
-
-agent computekernel(payoff *x, payoff epsilon, const agent *a, const agent *dr, const meter *sp) {
+*/
+agent computekernel(payoff *x, payoff epsilon, const agent *a, const agent *dr, const meter *sp, int *degree) {
 
 	filltables();
 	register agent *ai = (agent *)malloc(sizeof(agent) * N);
@@ -475,7 +476,7 @@ agent computekernel(payoff *x, payoff epsilon, const agent *a, const agent *dr, 
 
 	do {
 		QSORT(agent, sol.cs + Y(sol.s, *p), X(sol.s, *p), ltdr);
-		register payoff v = COST(*p, sol.dr, sol.l);
+		register payoff v = COST(*p, sol.dr, sol.l) + TIMECOST(sol.wait[*p]);
 		for (j = 0; j < X(sol.s, *p); j++) {
 			x[sol.cs[Y(sol.s, *p) + j]] = -v / X(sol.s, *p);
 			ai[sol.cs[Y(sol.s, *p) + j]] = *p;
@@ -498,21 +499,30 @@ agent computekernel(payoff *x, payoff epsilon, const agent *a, const agent *dr, 
 				if (t > d) { d = t; mi = i; mj = j; }
 			}
 
-		vmj = drg[mj] ? PATHCOST(sp[2 * mj * 2 * N + 2 * mj + 1]) : TICKETCOST;
+		vmj = drg[mj] ? PATHCOST(sp[2 * mj * 2 * N + 2 * mj + 1]) + CARCOST : TICKETCOST;
 		if ((e = x[mj] + vmj) >= d / 2) e = d / 2;
 		x[mi] += e;
 		x[mj] -= e;
 
 	} while (d / opt > epsilon);
+	
+	//end kernel computation
+	//start analysis
 
 	size_t minc[N], maxc[N];
 	payoff minp[N], maxp[N];
-
+	int mind[N], maxd[N];
+	int mins[N], maxs[N];
+	
 	for (i = 0; i < N; i++) {
 		minc[i] = UINTMAX_MAX;
 		maxc[i] = 0;
 		minp[i] = INFINITY;
 		maxp[i] = -INFINITY;
+		mind[i] = INT_MAX;
+		maxd[i] = 0;
+		mins[i] = INT_MAX;
+		maxs[i] = 0;
 	}
 
 	p = sol.n + N + 1;
@@ -523,23 +533,83 @@ agent computekernel(payoff *x, payoff epsilon, const agent *a, const agent *dr, 
 			for (j = 0; j < X(sol.s, *p); j++) {
 				minc[*p] = min(minc[*p], ccount[sol.cs[Y(sol.s, *p) + j]]);
 				maxc[*p] = max(maxc[*p], ccount[sol.cs[Y(sol.s, *p) + j]]);
+				
 				minp[*p] = min(minp[*p], x[sol.cs[Y(sol.s, *p) + j]]);
 				maxp[*p] = max(maxp[*p], x[sol.cs[Y(sol.s, *p) + j]]);
+				
+				mind[*p] = min(mind[*p], degree[sol.cs[Y(sol.s, *p) + j]]);
+				maxd[*p] = max(maxd[*p], degree[sol.cs[Y(sol.s, *p) + j]]);
+				
+				mins[*p] = min(mins[*p], tpstart[sol.cs[Y(sol.s, *p) + j]].maxbefore);
+				maxs[*p] = max(maxs[*p], tpstart[sol.cs[Y(sol.s, *p) + j]].maxbefore);
 			}
 		}
 		p++;
 	} while (--i);
 
 	double r[2 * N];
+	double rdegreeVSpayment[2 * N];
+	double rslackVSpayment[2 * N];
 
+	//normalised coalition number, normalised payment
 	for (i = 0; i < N; i++)
 		if (X(sol.s, ai[i]) > 1) {
 			X(r, i) = maxc[ai[i]] == minc[ai[i]] ? 0.5 : ((double)ccount[i] - minc[ai[i]]) / (maxc[ai[i]] - minc[ai[i]]);
 			Y(r, i) = maxp[ai[i]] == minp[ai[i]] ? 0.5 : ((double)x[i] - minp[ai[ i]]) / (maxp[ai[i]] - minp[ai[i]]);
 		}
+	
+	for (i = 0; i < N; i++) if (X(sol.s, ai[i]) > 1) printf("nc_np %f,%f\n", X(r, i), Y(r, i));
+	
+	//normalised degree, normalised payment
+	for (i = 0; i < N; i++)
+		if (X(sol.s, ai[i]) > 1) {
+			X(rdegreeVSpayment, i) = maxd[ai[i]] == mind[ai[i]] ? 0.5 : ((double)degree[i] - mind[ai[i]]) / (maxd[ai[i]] - mind[ai[i]]);
+			Y(rdegreeVSpayment, i) = Y(r, i);
+		}
 
-	for (i = 0; i < N; i++) if (X(sol.s, ai[i]) > 1) printf("%f,%f\n", X(r, i), Y(r, i));
+	for (i = 0; i < N; i++) if (X(sol.s, ai[i]) > 1) printf("nd_np %f,%f\n", X(rdegreeVSpayment, i), Y(rdegreeVSpayment, i));
+	
+	//normalised time slack, normalised payment
+	for (i = 0; i < N; i++)
+		if (X(sol.s, ai[i]) > 1) {
+			X(rslackVSpayment, i) = maxs[ai[i]] == mins[ai[i]] ? 0.5 : ((double)tpstart[i].maxbefore - mins[ai[i]]) / (maxs[ai[i]] - mins[ai[i]]);
+			Y(rslackVSpayment, i) = Y(r, i);
+		}
 
+	for (i = 0; i < N; i++) if (X(sol.s, ai[i]) > 1) printf("ns_np %f,%f\n", X(rslackVSpayment, i), Y(rslackVSpayment, i));
+	
+	//coalition number, normalised payment, driver rider
+	size_t mincn = UINTMAX_MAX;
+	size_t maxcn = 0;
+	for (i = 0; i < N; i++) {
+		mincn = min(mincn, ccount[i]);
+		maxcn = max(maxcn, ccount[i]);
+	}	
+	for (i = 0; i < N; i++)
+		if (X(sol.s, ai[i]) > 1)
+			printf("cn_np_%s %.2f,%f\n", (sol.dr[i] ? "driver" : "rider"), ((double)ccount[i] - mincn) / (maxcn - mincn), Y(r, i));
+
+	
+	
+	//degree, normalised payment, driver rider
+	size_t mindg = INT_MAX;
+	size_t maxdg = 0;
+	for (i = 0; i < N; i++) {
+		mindg = min(mindg, degree[i]);
+		maxdg = max(maxdg, degree[i]);
+	}
+	for (i = 0; i < N; i++)
+		if (X(sol.s, ai[i]) > 1)
+			printf("dg_np_%s %.2f,%f\n", (sol.dr[i] ? "driver" : "rider"), ((double)degree[i] - mindg) / (maxdg - mindg), Y(r, i));
+		
+		
+	//time slack, normalised payment, driver rider
+	for (i = 0; i < N; i++)
+		if (X(sol.s, ai[i]) > 1) {
+			printf("ts_np_%s %d,%f\n", (sol.dr[i] ? "driver" : "rider"), tpstart[i].maxbefore, Y(r, i));
+		}
+	
+		
 	free(ai);
 	free(l);
 	return it;
@@ -561,7 +631,7 @@ size_t enumerate(const agent *a, const agent *dr) {
 
 	return ret;
 }
-
+/*
 __attribute__((always_inline)) inline
 size_t enumeratedslyce(const agent *a, const agent *dr) {
 
@@ -581,4 +651,4 @@ size_t enumeratedslyce(const agent *a, const agent *dr) {
 
         for (i = 0; i < t; i++) ret += c[i];
         return ret;
-}
+}*/

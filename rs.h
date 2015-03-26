@@ -10,6 +10,7 @@
 #include <sys/time.h>
 #include "types.h"
 #include <time.h>
+#include <signal.h>
 
 #define IDX "idx.dat"
 #define ADJ "adj.dat"
@@ -21,12 +22,12 @@
 #define R3 6
 
 #define CARCOST 100
-#define TICKETCOST 500
+#define TICKETCOST 300
 #define PENNYPERLITRE 130
 #define METERSPERLITRE 15000
 #define MAXDRIVERS 1
 #define EPSILON 0.05
-#define K 2
+#define K 4
 
 #define REORDER
 //#define TWITTER
@@ -34,11 +35,11 @@
 //#define NAIVE
 
 #ifndef TWITTER
-#define N 15
+#define N 30
 #define E (K * N - (K * (K + 1)) / 2)
-#define DRIVERPERC 40
+#define DRIVERPERC 50
 #define MINGAIN 1
-#define SEED 4646ULL//45345ULL //91284ULL//
+#define SEED 7897ULL
 #endif
 
 #ifdef METIS
@@ -68,8 +69,9 @@
 
 #define SPEED (50/3.6) //50kmh
 #define TRAVELTIME(p) (int)(p/SPEED)
-#define COSTTIME(s) ROUND(penny, (float)(s) / 3600 * 200)
-#define INFINITE UINT16_MAX
+#define TIMECOST(s) ROUND(penny, (float)(s) / 3600 * 200)
+//#define TIMECOST(s) ROUND(penny, exp((float)(s) / 900 * 3.91)/10)
+#define INF UINT32_MAX
 
 #define OR(x, y) ({ register uint_fast8_t i; for (i = 0; i < R; i++) x[i] = _mm_or_si128(x[i], y[i]); })
 #define ANDNOT(x, y) ({ register uint_fast8_t i; for (i = 0; i < R; i++) x[i] = _mm_andnot_si128(y[i], x[i]); })
