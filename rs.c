@@ -855,7 +855,7 @@ int main(int argc, char *argv[]) {
 		st[0].n[st[0].n[i] = N + i + 1] = i;
 	}
 
-	//penny in = opt;
+	penny in = opt;
 	init(SEED);
 	#ifdef TWITTER
 	memcpy(st[0].g, g, sizeof(edge) * N * N);
@@ -890,36 +890,8 @@ int main(int argc, char *argv[]) {
 
 	sol = st[0];
 	edgecontraction(st, 0, c, r, d, opt, sp, NULL);
-	size_t maxc = split[0];
-	for (i = 1; i < E; i++) maxc = split[i] > maxc ? split[i] : maxc;
+	printf("%u,%u,%llu,%u,%u\n", N, D, SEED, in, opt);
 	//printcs(sol.s, sol.cs, sol.n, sol.dr, sol.l);
-	payoff x[N];
-	gettimeofday(&t1, NULL);
-	agent deg[N] = { 0 };
-
-	for (i = 0; i < N; i++)
-		for (j = i + 1; j < N; j++)
-			if (st[0].g[i * N + j]) { deg[i]++; deg[j]++; }
-
-	if (sol.n[N] != N) i = computekernel(x, EPSILON, st[0].a, st[0].dr, sp, deg);
-	gettimeofday(&t2, NULL);
-	//double dt = (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec;
-	//printf("%u,%u,%u,%u,%llu,%u,%u,%zu,%zu,%u,%f\n", N, sol.n[N], D, MINGAIN, SEED, in, opt, count, maxc, i, dt);
-
-	/*
-	printf("Total cost with ridesharing = %.2f£\n", POUND(opt));
-	printf("%zu CSs\n", count);
-
-	for (i = 0; i < E; i++)
-		if (split[i]) printf("%zu CSs (%.2f%%)\n", split[i], (double)split[i] * 100 / (count - 1));
-
-	puts("Gains:");
-	for (i = 0; i < sizeof(thrs) / sizeof(penny); i++)
-		if (gains[i]) printf("[%06.2f£, %06.2f£] = %zu\n", POUND(!i ? 0 : thrs[i - 1]), POUND(thrs[i]), gains[i]);
-
-	printf("Checksum = %u (size = %zu bytes)\n", crc32(sp, sizeof(dist) * 4 * N * N), sizeof(dist) * 4 * N * N);
-	printf("%f seconds\n", (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
-	*/
 
 	free(stops);
 	free(idx);
