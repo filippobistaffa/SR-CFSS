@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 tmp=`mktemp`
-basename="/media/filippo/data/twitter-2010"
+basename="net/twitter-2010"
 wg="wg"
 
 java -Xmx4000m -cp .:$wg/* ReduceGraph $basename $1 $3 > $tmp
