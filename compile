@@ -5,6 +5,5 @@ basename="/media/filippo/data/twitter-2010"
 wg="wg"
 
 java -Xmx4000m -cp .:$wg/* ReduceGraph $basename $1 $3 > $tmp
-g++ -Wall -Wno-psabi -Wno-unused-result -Ofast -march=native -funroll-loops -fopenmp -ftree-vectorizer-verbose=0 -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 \
--DDRIVERPERC=$2 -DSEED=$3ULL -include types.h -include $tmp *.c -o /tmp/$1-$2-$3
+g++ -Wall -Wno-psabi -Wno-unused-result -O0 -march=native -fopenmp -DDRIVERPERC=$2 -DSEED=$3ULL -include types.h -include $tmp *.c -o /tmp/$1-$2-$3
 rm $tmp
