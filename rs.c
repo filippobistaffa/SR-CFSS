@@ -1,7 +1,9 @@
 #include "rs.h"
 
 uint64_t count;
+#ifndef CLINK
 static uint64_t split[E];
+#endif
 static uint64_t ccount[N];
 
 penny opt;
@@ -283,7 +285,7 @@ void printcsordered(const agent *s, const agent *cs, const agent *n) {
 #include "graphviz/gvc.h"
 
 static char* names[] = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", \
-			 "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "26", "28", "29", "30" };
+			       "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "26", "28", "29", "30" };
 
 void graph2png(const agent *a, const agent *n, const contr c, const contr r, const contr d, const char* filename) {
 
@@ -298,7 +300,7 @@ void graph2png(const agent *a, const agent *n, const contr c, const contr r, con
 	while (--m);
 
 	for (i = 1; i < E + 1; i++) if (!ISSET(c, i) && !ISSET(d, i)) {
-		Agedge_t *e = agedge(g, nodes[X(a, i)], nodes[Y(a, i)], "", 1);
+		Agedge_t *e = agedge(g, nodes[X(a, i)], nodes[Y(a, i)], names[i], 1);
 		if (ISSET(r, i)) agsafeset(e, "color", "red", "");
 	}
 
@@ -444,17 +446,79 @@ penny bound(const agent *a, const agent *n, const contr c, const contr r, const 
 	return b;
 }
 
-void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, const meter *sp, uint64_t *cnt) {
+#include <limits>
+template <typename type>
+unsigned minidx(const type *buf, unsigned n) {
+
+	register type minval = std::numeric_limits<type>::max();
+	register unsigned minidx = 0;
+
+	for (unsigned i = 0; i < n; i++)
+		if (buf[i] < minval) { minval = buf[i]; minidx = i; }
+
+	return minidx;
+}
+
+#ifdef CLINK
+
+#ifdef GAINLINK 
+#define LINKAGE(MER, CUR, V1, V2) (COST(V1, (MER).dr, (MER).l) - COST(V1, (CUR).dr, (CUR).l) - COST(V2, (CUR).dr, (CUR).l))
+#endif
+
+#endif
+
+void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, const meter *sp, stack *est = NULL, int *link = NULL, uint64_t *cnt = NULL) {
 
 	count++;
 	stack cur = *st;
 	if (cnt) (*cnt)++;
 	if (tot < opt) { sol = cur; opt = tot; }
+	#ifndef CLINK
 	if (bound(cur.a, cur.n, c, r, d, cur.s, cur.cs, cur.dr, cur.l, sp) >= opt - MINGAIN) return;
+	#endif
 
-	__m128i h[R], rt[R];
 	register edge f, j;
 	register agent v1, v2;
+
+	#ifdef CLINK
+	__m128i h[R * (E + 1)];
+
+	//printcs(cur.s, cur.cs, cur.n, cur.dr, cur.l);
+	//char filename[100];
+	//sprintf(filename, "/home/filippo/rs/img/%u.png", e);
+	//graph2png(cur.a, cur.n, c, r, d, filename);
+
+	for (f = 1; f < E + 1; f++) link[f] = INT_MAX;
+
+	for (f = 1; f < E + 1; f++)
+		if (!ISSET(c, f) && !ISSET(r, f) && !ISSET(d, f)) {
+			//printf("f = %u\n", f);
+			if (!(cur.dr[v1 = X(cur.a, f)] + cur.dr[v2 = Y(cur.a, f)])) continue;
+			if (X(cur.s, v1) + X(cur.s, v2) > CAR || cur.dr[v1] + cur.dr[v2] > MAXDRIVERS) continue;
+			est[f] = cur;
+			for (j = 0; j < R; j++) h[R * f + j] = _mm_setzero_si128();
+			merge(v1, v2, est[f].n, est[f].s, est[f].cs, est[f].dr);
+			contract(est[f].g, est[f].a, est[f].n, v1, v2, r, h + R * f);
+			est[f].l[v1] = minpath(est[f].cs + Y(est[f].s, v1), X(est[f].s, v1), est[f].dr[v1], sp);
+			//printcs(est[f].s, est[f].cs, est[f].n, est[f].dr, est[f].l);
+			link[f] = LINKAGE(est[f], cur, v1, v2);
+			//printf("f = %u linkage = %d\n", f, link[f]);
+		}
+
+	f = minidx(link + 1, E) + 1;
+	if (link[f] <= 0) {
+		v1 = X(cur.a, f);
+		v2 = Y(cur.a, f);
+		//printf("will contract %u (%u -- %u)\n", f, v1, v2);
+		st[1] = est[f];
+		SET(r, f);
+		SET(c, f);
+		OR(d, h + R * f);
+		edgecontraction(st + 1, f, c, r, d, tot + COST(v1, st[1].dr, st[1].l) - COST(v1, cur.dr, cur.l) - COST(v2, cur.dr, cur.l), sp, est, link);
+	}
+
+	#else
+	__m128i h[R], rt[R];
 
 	for (f = 1; f < E + 1; f++)
 		if (!ISSET(c, f) && !ISSET(r, f) && !ISSET(d, f)) {
@@ -470,10 +534,11 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 			SET(c, f);
 			OR(d, h);
 			edgecontraction(st + 1, f, c, rt, d, tot + COST(v1, st[1].dr, st[1].l) - COST(v1, cur.dr, cur.l) - COST(v2, cur.dr, cur.l), \
-			sp, cnt ? cnt : split + f - 1);
+			sp, NULL, NULL, cnt ? cnt : split + f - 1);
 			CLEAR(c, f);
 			ANDNOT(d, h);
 		}
+	#endif
 }
 
 __attribute__((always_inline)) inline
@@ -889,9 +954,15 @@ int main(int argc, char *argv[]) {
 		r[i] = c[i] = d[i] = _mm_setzero_si128();
 
 	sol = st[0];
-	edgecontraction(st, 0, c, r, d, opt, sp, NULL);
+	#ifdef CLINK
+	int link[E + 1];
+	stack est[E + 1];
+	edgecontraction(st, 0, c, r, d, opt, sp, est, link);
+	#else
+	edgecontraction(st, 0, c, r, d, opt, sp);
+	#endif
 	printf("%u,%u,%llu,%u,%u\n", N, D, SEED, in, opt);
-	//printcs(sol.s, sol.cs, sol.n, sol.dr, sol.l);
+	printcs(sol.s, sol.cs, sol.n, sol.dr, sol.l);
 
 	free(stops);
 	free(idx);
