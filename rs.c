@@ -7,7 +7,7 @@ static uint64_t split[E];
 static uint64_t ccount[N];
 
 penny opt;
-static stack sol;
+static stack sol, initial;
 struct timeval t1, t2;
 static agent csg[N], sg[2 * N];
 
@@ -459,15 +459,9 @@ unsigned minidx(const type *buf, unsigned n) {
 	return minidx;
 }
 
-#ifdef CLINK
+#include <float.h>
 
-#ifdef GAINLINK 
-#define LINKAGE(MER, CUR, V1, V2) (COST(V1, (MER).dr, (MER).l) - COST(V1, (CUR).dr, (CUR).l) - COST(V2, (CUR).dr, (CUR).l))
-#endif
-
-#endif
-
-void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, const meter *sp, stack *est = NULL, int *link = NULL, uint64_t *cnt = NULL) {
+void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, const meter *sp, stack *est = NULL, float *link = NULL, uint64_t *cnt = NULL) {
 
 	count++;
 	stack cur = *st;
@@ -481,6 +475,7 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 	register agent v1, v2;
 
 	#ifdef CLINK
+	#define GAIN(MER, CUR, V1, V2) (COST(V1, (MER).dr, (MER).l) - COST(V1, (CUR).dr, (CUR).l) - COST(V2, (CUR).dr, (CUR).l))
 	__m128i h[R * (E + 1)];
 
 	//printcs(cur.s, cur.cs, cur.n, cur.dr, cur.l);
@@ -488,11 +483,11 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 	//sprintf(filename, "/home/filippo/rs/img/%u.png", e);
 	//graph2png(cur.a, cur.n, c, r, d, filename);
 
-	for (f = 1; f < E + 1; f++) link[f] = INT_MAX;
+	for (f = 1; f < E + 1; f++) link[f] = FLT_MAX;
 
 	for (f = 1; f < E + 1; f++)
 		if (!ISSET(c, f) && !ISSET(r, f) && !ISSET(d, f)) {
-			//printf("f = %u\n", f);
+			//printf("f = %u (%u -- %u)\n", f, X(cur.a, f), Y(cur.a, f));
 			if (!(cur.dr[v1 = X(cur.a, f)] + cur.dr[v2 = Y(cur.a, f)])) continue;
 			if (X(cur.s, v1) + X(cur.s, v2) > CAR || cur.dr[v1] + cur.dr[v2] > MAXDRIVERS) continue;
 			est[f] = cur;
@@ -501,15 +496,48 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 			contract(est[f].g, est[f].a, est[f].n, v1, v2, r, h + R * f);
 			est[f].l[v1] = minpath(est[f].cs + Y(est[f].s, v1), X(est[f].s, v1), est[f].dr[v1], sp);
 			//printcs(est[f].s, est[f].cs, est[f].n, est[f].dr, est[f].l);
-			link[f] = LINKAGE(est[f], cur, v1, v2);
-			//printf("f = %u linkage = %d\n", f, link[f]);
+			#ifdef GAINLINK
+			link[f] = GAIN(est[f], cur, v1, v2);
+			#else
+			#ifdef COMPLETELINK
+			link[f] = -FLT_MAX;
+			#endif
+			#ifdef AVERAGELINK
+			link[f] = 0;
+			uint32_t ncouples = 0;
+			#endif
+			for (int i = 0; i < X(cur.s, v1); i++)
+				for (int j = 0; j < X(cur.s, v2); j++) {
+					stack tmp = initial;
+					//printf("%u %u\n", cur.cs[Y(cur.s, v1) + i], cur.cs[Y(cur.s, v2) + j]);
+		 			if (!(tmp.dr[cur.cs[Y(cur.s, v1) + i]] + tmp.dr[cur.cs[Y(cur.s, v2) + j]])) continue;
+					merge(cur.cs[Y(cur.s, v1) + i], cur.cs[Y(cur.s, v2) + j], tmp.n, tmp.s, tmp.cs, tmp.dr);
+					//printcs(tmp.s, tmp.cs, tmp.n, tmp.dr, tmp.l);
+					float curlink = GAIN(tmp, initial, cur.cs[Y(cur.s, v1) + i], cur.cs[Y(cur.s, v2) + j]);
+					//printf("curlink = %f\n", curlink);
+					#ifdef SINGLELINK
+					if (curlink < link[f]) link[f] = curlink;
+					#endif
+					#ifdef COMPLETELINK
+					if (curlink > link[f]) link[f] = curlink;
+					#endif
+					#ifdef AVERAGELINK
+					link[f] += curlink;
+					ncouples++;
+					#endif
+				}
+			#ifdef AVERAGELINK
+			link[f] /= ncouples;
+			#endif
+			#endif
+			//printf("f = %u linkage = %f\n", f, link[f]);
 		}
 
 	f = minidx(link + 1, E) + 1;
 	if (link[f] <= 0) {
 		v1 = X(cur.a, f);
 		v2 = Y(cur.a, f);
-		//printf("will contract %u (%u -- %u)\n", f, v1, v2);
+		//printf("\nwill contract %u (%u -- %u)\n\n", f, v1, v2);
 		st[1] = est[f];
 		SET(r, f);
 		SET(c, f);
@@ -953,16 +981,16 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < R; i++)
 		r[i] = c[i] = d[i] = _mm_setzero_si128();
 
-	sol = st[0];
+	initial = sol = st[0];
 	#ifdef CLINK
-	int link[E + 1];
+	float link[E + 1];
 	stack est[E + 1];
 	edgecontraction(st, 0, c, r, d, opt, sp, est, link);
 	#else
 	edgecontraction(st, 0, c, r, d, opt, sp);
 	#endif
 	printf("%u,%u,%llu,%u,%u\n", N, D, SEED, in, opt);
-	printcs(sol.s, sol.cs, sol.n, sol.dr, sol.l);
+	//printcs(sol.s, sol.cs, sol.n, sol.dr, sol.l);
 
 	free(stops);
 	free(idx);

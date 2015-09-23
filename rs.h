@@ -33,9 +33,12 @@
 //#define PARALLEL
 //#define NAIVE
 
-//#define CLINK
+#define CLINK
 #define GAINLINK
-#define GRAPHVIZ
+//#define SINGLELINK
+//#define COMPLETELINK
+//#define AVERAGELINK
+//#define GRAPHVIZ
 
 #ifndef TWITTER
 #define N 10
