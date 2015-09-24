@@ -468,7 +468,7 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 	if (cnt) (*cnt)++;
 	if (tot < opt) { sol = cur; opt = tot; }
 	#ifndef CLINK
-	if (bound(cur.a, cur.n, c, r, d, cur.s, cur.cs, cur.dr, cur.l, sp) >= opt - MINGAIN) return;
+	//if (bound(cur.a, cur.n, c, r, d, cur.s, cur.cs, cur.dr, cur.l, sp) >= opt - MINGAIN) return;
 	#endif
 
 	register edge f, j;
@@ -922,7 +922,7 @@ int main(int argc, char *argv[]) {
 	meter *sp = (meter *)calloc(4 * N * N, sizeof(meter));
 	//printf("Using %u threads\n", omp_get_max_threads());
 
-	//#pragma omp parallel for schedule(dynamic) private(i, j)
+	#pragma omp parallel for schedule(dynamic) private(i, j)
 	for (i = 0; i < 2 * N; i++) {
 		sp[i * 2 * N + i] = UINT32_MAX;
 		for (j = i + 1; j < 2 * N; j++)
@@ -932,7 +932,9 @@ int main(int argc, char *argv[]) {
 	free(ds);
 	free(adj);
 
-	stack st[N];
+	//stack st[N];
+	stack *st = (stack *)malloc(sizeof(stack) * N);
+	if (!st) { printf("Error allocating stack (%zu bytes)\n", sizeof(stack) * N); exit(1); }
 	memset(st[0].g, 0, sizeof(edge) * N * N);
 
 	for (i = 0; i < D; i++) st[0].dr[i] = 1;
@@ -981,11 +983,16 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < R; i++)
 		r[i] = c[i] = d[i] = _mm_setzero_si128();
 
+	puts("ciao");
 	initial = sol = st[0];
 	#ifdef CLINK
-	float link[E + 1];
-	stack est[E + 1];
+	//float link[E + 1];
+	//stack est[E + 1];
+	float *link = (float *)malloc(sizeof(float) * (E + 1));
+	stack *est = (stack *)malloc(sizeof(stack) * (E + 1));
 	edgecontraction(st, 0, c, r, d, opt, sp, est, link);
+	free(link);
+	free(est);
 	#else
 	edgecontraction(st, 0, c, r, d, opt, sp);
 	#endif
@@ -996,5 +1003,6 @@ int main(int argc, char *argv[]) {
 	free(idx);
 	free(xy);
 	free(sp);
+	free(st);
 	return 0;
 }

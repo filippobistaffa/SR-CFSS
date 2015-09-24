@@ -23,7 +23,7 @@
 #define TICKETCOST 300
 #define PENNYPERLITRE 130
 #define METERSPERLITRE 15000
-#define MAXDRIVERS 1
+#define MAXDRIVERS 5
 #define EPSILON 0.05
 #define MINGAIN 1
 #define K 2
@@ -41,7 +41,7 @@
 //#define GRAPHVIZ
 
 #ifndef TWITTER
-#define N 10
+#define N 1500
 #define E (K * N - (K * (K + 1)) / 2)
 #define DRIVERPERC 50
 #define MINGAIN 1
