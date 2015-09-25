@@ -4,7 +4,8 @@ tmp=`mktemp`
 basename="net/twitter-2010"
 wg="wg"
 
+cd /home/filippo/phd/rs
 java -Xmx4000m -cp .:$wg/* ReduceGraph $basename $1 $2 > $tmp
-g++ -g -Wall -Wno-psabi -O0 -march=native -funroll-loops -fopenmp -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 \
+g++ -Wall -Wno-psabi -O2 -march=native -funroll-loops -fopenmp -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 \
 -DSEED=$2ULL -include types.h -include $tmp *.c -o /tmp/$1-$2
 rm $tmp

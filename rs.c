@@ -439,11 +439,11 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 	float tl, bl = FLT_MAX;
 	__m128i th[R], bh[R];
 	stack tst, bst;
-	edge bf;
+	edge bf = 0;
 
 	for (f = 1; f < E + 1; f++)
 		if (!ISSET(c, f) && !ISSET(r, f) && !ISSET(d, f)) {
-			//printf("f = %u (%u -- %u)\n", f, X(cur.a, f), Y(cur.a, f));
+			//printf("f = %u (%lu -- %lu)\n", f, X(cur.a, f), Y(cur.a, f));
 			if (!(cur.dr[v1 = X(cur.a, f)] + cur.dr[v2 = Y(cur.a, f)])) continue;
 			if (X(cur.s, v1) + X(cur.s, v2) > CAR || cur.dr[v1] + cur.dr[v2] > MAXDRIVERS) continue;
 			tst = cur;
@@ -453,7 +453,7 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 			tst.l[v1] = minpath(tst.cs + Y(tst.s, v1), X(tst.s, v1), tst.dr[v1], sp);
 			//printcs(tst.s, tst.cs, tst.n, tst.dr, tst.l);
 			tl = GAIN(tst, cur, v1, v2);
-			//printf("f = %u linkage = %f\n", f, link[f]);
+			//printf("f = %u linkage = %f\n", f, tl);
 
 			if (tl < bl) {
 				bf = f;
@@ -466,7 +466,7 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 	if (bl <= 0) {
 		v1 = X(cur.a, bf);
 		v2 = Y(cur.a, bf);
-		//printf("\nwill contract %u (%u -- %u)\n\n", f, v1, v2);
+		//printf("\nwill contract %u (%lu -- %lu)\n\n", bf, v1, v2);
 		st[1] = bst;
 		SET(r, bf);
 		SET(c, bf);
@@ -914,6 +914,6 @@ int main(int argc, char *argv[]) {
 	edgecontraction(st, 0, c, r, d, opt, sp);
 	gettimeofday(&t2, NULL);
 	free(sp);
-	printf("%u,%u,%llu,%u,%u,%u,%f\n", N, D, SEED, LIMIT, in, opt, (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
+	printf("%u,%llu,%u,%u,%f\n", N + 700, SEED, in, opt, (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
 	return 0;
 }
