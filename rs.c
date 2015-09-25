@@ -2,7 +2,9 @@
 
 uint8_t stop;
 uint64_t count;
+#ifndef CLINK
 static uint64_t split[E];
+#endif
 struct timeval t1, t2;
 
 penny opt, bou;
@@ -417,25 +419,63 @@ penny bound(const agent *a, const agent *n, const contr c, const contr r, const 
 	return b;
 }
 
-void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, const meter *sp, uint64_t *cnt) {
+#include <float.h>
+
+void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, const meter *sp, uint64_t *cnt = NULL) {
 
 	if (!stop) gettimeofday(&t2, NULL);
-	//printf("%f\n", (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
 	if (stop || (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec > LIMIT) stop = 1;
 	stack cur = *st;
 	count++;
 	if (cnt) (*cnt)++;
 	if (tot < opt) { sol = cur; bou = opt = tot; }
-	//
 	if (stop) return;
-	//
-	//register penny b = bound(cur.a, cur.n, c, r, d, cur.s, cur.cs, cur.dr, cur.l, sp);
-	//if (stop) { if (b < bou) bou = b; return; }
-	//else if (b >= opt - MINGAIN) return;
 
-	__m128i h[R], rt[R];
 	register edge f, j;
 	register agent v1, v2;
+
+	#ifdef CLINK
+	#define GAIN(MER, CUR, V1, V2) ((float)(COST(V1, (MER).dr, (MER).l)) - COST(V1, (CUR).dr, (CUR).l) - COST(V2, (CUR).dr, (CUR).l))
+	float tl, bl = FLT_MAX;
+	__m128i th[R], bh[R];
+	stack tst, bst;
+	edge bf;
+
+	for (f = 1; f < E + 1; f++)
+		if (!ISSET(c, f) && !ISSET(r, f) && !ISSET(d, f)) {
+			//printf("f = %u (%u -- %u)\n", f, X(cur.a, f), Y(cur.a, f));
+			if (!(cur.dr[v1 = X(cur.a, f)] + cur.dr[v2 = Y(cur.a, f)])) continue;
+			if (X(cur.s, v1) + X(cur.s, v2) > CAR || cur.dr[v1] + cur.dr[v2] > MAXDRIVERS) continue;
+			tst = cur;
+			for (j = 0; j < R; j++) th[j] = _mm_setzero_si128();
+			merge(v1, v2, tst.n, tst.s, tst.cs, tst.dr);
+			contract(tst.g, tst.a, tst.n, v1, v2, r, th);
+			tst.l[v1] = minpath(tst.cs + Y(tst.s, v1), X(tst.s, v1), tst.dr[v1], sp);
+			//printcs(tst.s, tst.cs, tst.n, tst.dr, tst.l);
+			tl = GAIN(tst, cur, v1, v2);
+			//printf("f = %u linkage = %f\n", f, link[f]);
+
+			if (tl < bl) {
+				bf = f;
+				bl = tl;
+				bst = tst;
+				memcpy(bh, th, sizeof(__m128i) * R);
+			}
+		}
+
+	if (bl <= 0) {
+		v1 = X(cur.a, bf);
+		v2 = Y(cur.a, bf);
+		//printf("\nwill contract %u (%u -- %u)\n\n", f, v1, v2);
+		st[1] = bst;
+		SET(r, bf);
+		SET(c, bf);
+		OR(d, bh);
+		edgecontraction(st + 1, bf, c, r, d, tot + COST(v1, st[1].dr, st[1].l) - COST(v1, cur.dr, cur.l) - COST(v2, cur.dr, cur.l), sp);
+	}
+
+	#else
+	__m128i h[R], rt[R];
 
 	for (f = 1; f < E + 1; f++)
 		if (!ISSET(c, f) && !ISSET(r, f) && !ISSET(d, f)) {
@@ -456,6 +496,7 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 			CLEAR(c, f);
 			ANDNOT(d, h);
 		}
+	#endif
 }
 
 __attribute__((always_inline)) inline
@@ -870,7 +911,7 @@ int main(int argc, char *argv[]) {
 
 	sol = st[0];
 	gettimeofday(&t1, NULL);
-	edgecontraction(st, 0, c, r, d, opt, sp, NULL);
+	edgecontraction(st, 0, c, r, d, opt, sp);
 	gettimeofday(&t2, NULL);
 	free(sp);
 	printf("%u,%u,%llu,%u,%u,%u,%f\n", N, D, SEED, LIMIT, in, opt, (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);

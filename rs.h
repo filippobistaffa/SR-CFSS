@@ -34,11 +34,11 @@
 #define PARALLEL
 #define TWITTER
 
+#define CLINK
+
 #ifndef TWITTER
-#define N 100
+#define N 500
 #define E (K * N - (K * (K + 1)) / 2)
-#define DRIVERPERC 20
-#define LIMIT 100
 #define SEED 9872124ULL
 #endif
 
@@ -65,16 +65,16 @@
 #define X(v, i) ((v)[2 * (i)])
 #define Y(v, i) ((v)[2 * (i) + 1])
 
-#define OR(x, y) ({ register uint_fast32_t i; for (i = 0; i < R; i++) x[i] = _mm_or_si128(x[i], y[i]); })
-#define ANDNOT(x, y) ({ register uint_fast32_t i; for (i = 0; i < R; i++) x[i] = _mm_andnot_si128(y[i], x[i]); })
-#define ISSET(x, i) ((_mm_cvtsi128_si64(((i) >> 6) & 1 ? _mm_srli_si128(x[(i) >> 7], 8) : x[(i) >> 7]) >> ((i) & 63)) & 1)
+#define OR(x, y) ({ register uint_fast32_t i; for (i = 0; i < R; i++) (x)[i] = _mm_or_si128((x)[i], (y)[i]); })
+#define ANDNOT(x, y) ({ register uint_fast32_t i; for (i = 0; i < R; i++) (x)[i] = _mm_andnot_si128((y)[i], (x)[i]); })
+#define ISSET(x, i) ((_mm_cvtsi128_si64(((i) >> 6) & 1 ? _mm_srli_si128((x)[(i) >> 7], 8) : (x)[(i) >> 7]) >> ((i) & 63)) & 1)
 #define CONTAINS(n, i) ((n)[(i)] <= (n)[N] + N)
 
-#define SET(x, i) ({ x[(i) >> 7] = _mm_or_si128(x[(i) >> 7], _mm_set_epi64x((((i) >> 6) & 1) ? 1ULL << ((i) & 63) : 0, \
+#define SET(x, i) ({ (x)[(i) >> 7] = _mm_or_si128((x)[(i) >> 7], _mm_set_epi64x((((i) >> 6) & 1) ? 1ULL << ((i) & 63) : 0, \
                      (((i) >> 6) & 1) ? 0 : 1ULL << ((i) & 63))); })
 
-#define CLEAR(x, i) ({ x[(i) >> 7] = _mm_andnot_si128(_mm_set_epi64x((((i) >> 6) & 1) ? 1ULL << ((i) & 63) : 0, \
-                       (((i) >> 6) & 1) ? 0 : 1ULL << ((i) & 63)), x[(i) >> 7]); })
+#define CLEAR(x, i) ({ (x)[(i) >> 7] = _mm_andnot_si128(_mm_set_epi64x((((i) >> 6) & 1) ? 1ULL << ((i) & 63) : 0, \
+                       (((i) >> 6) & 1) ? 0 : 1ULL << ((i) & 63)), (x)[(i) >> 7]); })
 
 typedef struct { place p; dist f; } item;
 typedef struct { agent x; agent y; } agentxy;
