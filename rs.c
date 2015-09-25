@@ -420,6 +420,7 @@ penny bound(const agent *a, const agent *n, const contr c, const contr r, const 
 void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, const meter *sp, uint64_t *cnt) {
 
 	if (!stop) gettimeofday(&t2, NULL);
+	//printf("%f\n", (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
 	if (stop || (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec > LIMIT) stop = 1;
 	stack cur = *st;
 	count++;
@@ -428,9 +429,9 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 	//
 	if (stop) return;
 	//
-	register penny b = bound(cur.a, cur.n, c, r, d, cur.s, cur.cs, cur.dr, cur.l, sp);
-	if (stop) { if (b < bou) bou = b; return; }
-	else if (b >= opt - MINGAIN) return;
+	//register penny b = bound(cur.a, cur.n, c, r, d, cur.s, cur.cs, cur.dr, cur.l, sp);
+	//if (stop) { if (b < bou) bou = b; return; }
+	//else if (b >= opt - MINGAIN) return;
 
 	__m128i h[R], rt[R];
 	register edge f, j;
@@ -438,6 +439,7 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 
 	for (f = 1; f < E + 1; f++)
 		if (!ISSET(c, f) && !ISSET(r, f) && !ISSET(d, f)) {
+			if (stop) break;
 			if (!(cur.dr[v1 = X(cur.a, f)] + cur.dr[v2 = Y(cur.a, f)])) continue;
 			memcpy(rt, r, sizeof(__m128i) * R);
 			SET(r, f);
@@ -732,8 +734,6 @@ void createScaleFree(edge *g, agent *a) {
 	}
 }
 
-#include "kernel.i"
-
 int main(int argc, char *argv[]) {
 
 	/*
@@ -820,6 +820,7 @@ int main(int argc, char *argv[]) {
         //fclose(f);
 
 	stack *st = (stack *)aligned_alloc(128, sizeof(stack) * N);
+	if (!st) { puts("Error allocating aligned stack"); exit(1); }
 	memset(st[0].g, 0, sizeof(edge) * N * N);
 
 	for (i = 0; i < D; i++) st[0].dr[i] = 1;
@@ -863,26 +864,6 @@ int main(int argc, char *argv[]) {
 	createScaleFree(st[0].g, st[0].a);
 	#endif
 
-	#ifdef REORDER
-	edge go[N * N] = {0};
-	agent ao[2 * (E + 1)];
-	#ifdef METIS
-	idx_t options[METIS_NOPTIONS];
-	METIS_SetDefaultOptions(options);
-	options[METIS_OPTION_OBJTYPE] = METIS_OBJTYPE_CUT;
-	options[METIS_OPTION_SEED] = SEED;
-	real_t tpwgts[2] = {0.5, 0.5}, ubvec = TOLERANCE;
-	agent map[N];
-	edge e = 1;
-	for (i = 0; i < N; i++) map[i] = i;
-	reorderedges(st[0].g, map, N, E, go, ao, &e, tpwgts, &ubvec, options);
-	#else
-	driversbfs(st[0].a, st[0].dr, go, ao);
-	#endif
-	memcpy(st[0].g, go, sizeof(edge) * N * N);
-	memcpy(st[0].a, ao, sizeof(agent) * 2 * (E + 1));
-	#endif
-
 	__m128i c[R], d[R], r[R];
 	for (i = 0; i < R; i++)
 		r[i] = c[i] = d[i] = _mm_setzero_si128();
@@ -890,24 +871,8 @@ int main(int argc, char *argv[]) {
 	sol = st[0];
 	gettimeofday(&t1, NULL);
 	edgecontraction(st, 0, c, r, d, opt, sp, NULL);
-	//f = fopen("sol.dat", "wb");
-	//fwrite(&sol, sizeof(stack), 1, f);
-	//fclose(f);
-	//f = fopen("opt.dat", "wb");
-	//fwrite(&opt, sizeof(penny), 1, f);
-	//fclose(f);
-	gettimeofday(&t1, NULL);
-	payoff x[N];
-	agent dr[N], a[2 * (E + 1)];
-	memcpy(dr, st[0].dr, sizeof(agent) * N);
-	memcpy(a, st[0].a, sizeof(agent) * 2 * (E + 1));
-	free(stops);
-	free(idx);
-	free(xy);
-	free(st);
-	if (sol.n[N] != N) i = computekernel(x, EPSILON, a, dr, sp);
 	gettimeofday(&t2, NULL);
 	free(sp);
-	printf("%u,%zu,%u,%llu,%u,%u,%u,%u,%u,%f\n", N, sol.n[N], D, SEED, LIMIT, in, opt, bou, i, (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
+	printf("%u,%u,%llu,%u,%u,%u,%f\n", N, D, SEED, LIMIT, in, opt, (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
 	return 0;
 }

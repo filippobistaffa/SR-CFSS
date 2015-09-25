@@ -4,7 +4,7 @@ tmp=`mktemp`
 basename="net/twitter-2010"
 wg="wg"
 
-java -Xmx4000m -cp .:$wg/* ReduceGraph $basename $1 $4 > $tmp
-g++ -Wall -Wno-psabi -O0 -march=native -funroll-loops -fopenmp -ftree-vectorizer-verbose=0 -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 \
--DDRIVERPERC=$2 -DLIMIT=$3 -DSEED=$4ULL -include types.h -include $tmp *.c -o /tmp/$1-$2-$3-$4
+java -Xmx4000m -cp .:$wg/* ReduceGraph $basename $1 $2 > $tmp
+g++ -g -Wall -Wno-psabi -O0 -march=native -funroll-loops -fopenmp -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 \
+-DSEED=$2ULL -include types.h -include $tmp *.c -o /tmp/$1-$2
 rm $tmp
