@@ -7,7 +7,7 @@ static uint64_t split[E];
 #endif
 struct timeval t1, t2;
 
-penny opt, bou;
+penny min;
 static stack sol;
 static agent csg[N];
 static agent sg[2 * N];
@@ -42,42 +42,6 @@ static agentpath mp[N];
 		printpath(q + *s, s + 1, p + 1);
 	}
 }*/
-
-__attribute__((always_inline)) inline
-void memcpyaligned(void* dest, const void* src, const size_t size) {
-
-	asm("mov %0, %%rsi\n\t"
-	    "mov %1, %%rdi\n\t"
-	    "mov %2, %%rbx\n\t"
-	    "shr $7, %%rbx\n\t"
-	    "1:\n\t"
-	    "prefetchnta 128(%%rsi)\n\t"
-	    "prefetchnta 160(%%rsi)\n\t"
-	    "prefetchnta 192(%%rsi)\n\t"
-	    "prefetchnta 224(%%rsi)\n\t"
-	    "movdqa 0(%%rsi), %%xmm0\n\t"
-	    "movdqa 16(%%rsi), %%xmm1\n\t"
-	    "movdqa 32(%%rsi), %%xmm2\n\t"
-	    "movdqa 48(%%rsi), %%xmm3\n\t"
-	    "movdqa 64(%%rsi), %%xmm4\n\t"
-	    "movdqa 80(%%rsi), %%xmm5\n\t"
-	    "movdqa 96(%%rsi), %%xmm6\n\t"
-	    "movdqa 112(%%rsi), %%xmm7\n\t"
-	    "movntdq %%xmm0, 0(%%rdi)\n\t"
-	    "movntdq %%xmm1, 16(%%rdi)\n\t"
-	    "movntdq %%xmm2, 32(%%rdi)\n\t"
-	    "movntdq %%xmm3, 48(%%rdi)\n\t"
-	    "movntdq %%xmm4, 64(%%rdi)\n\t"
-	    "movntdq %%xmm5, 80(%%rdi)\n\t"
-	    "movntdq %%xmm6, 96(%%rdi)\n\t"
-	    "movntdq %%xmm7, 112(%%rdi)\n\t"
-	    "add $128, %%rsi\n\t"
-	    "add $128, %%rdi\n\t"
-	    "dec %%rbx\n\t"
-	    "jnz 1b\n\t" ::
-	    "r"(src), "r"(dest), "r"(size) :
-	    "rsi", "rdi", "rbx", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "memory");
-}
 
 __attribute__((always_inline)) inline
 void minsse(meter *b, agent n) {
@@ -222,7 +186,7 @@ void merge(agent v1, agent v2, agent *n, agent *s, agent *cs, agent *dr) {
 }
 
 __attribute__((always_inline)) inline
-void contract(edge *g, agent *a, const agent *n, agent v1, agent v2, contr r, contr h) {
+void contract(edge *g, agent *a, const agent *n, agent v1, agent v2, chunk *r, chunk *h) {
 
 	register agent i, e, f, m = n[N];
 	register const agent *p = n + N + 1;
@@ -230,7 +194,7 @@ void contract(edge *g, agent *a, const agent *n, agent v1, agent v2, contr r, co
 	do if ((i = *(p++)) != v1)
 		if ((e = g[i * N + v2])) {
 			if ((f = g[i * N + v1])) {
-				if (ISSET(r, f)) SET(r, e);
+				if (r && ISSET(r, f)) SET(r, e);
 				SET(h, f);
 			}
 			g[i * N + v1] = g[v1 * N + i] = e;
@@ -288,7 +252,7 @@ void printcsordered(const agent *s, const agent *cs, const agent *n) {
 static char* names[] = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", \
 			 "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "26", "28", "29", "30" };
 
-void graph2png(const agent *a, const agent *n, const contr c, const contr r, const contr d, const char* filename) {
+void graph2png(const agent *a, const agent *n, const chunk *c, const chunk *r, const chunk *d, const char* filename) {
 
 	#include "graphviz/gvc.h"
 	register const agent *p = n + N + 1;
@@ -315,8 +279,7 @@ void graph2png(const agent *a, const agent *n, const contr c, const contr r, con
 
 #endif
 
-__attribute__((always_inline)) inline
-void connect(const agent *a, agent *n, const contr c, const contr r, const contr d, agent *s, agent *cs, agent *cars) {
+void connect(const agent *a, agent *n, const chunk *c, const chunk *r, const chunk *d, agent *s, agent *cs, agent *cars) {
 
 	register const agent *p = n + N + 1;
 	register agent b, i, j, f, e, m = n[N];
@@ -348,7 +311,7 @@ void connect(const agent *a, agent *n, const contr c, const contr r, const contr
 	} while (--m);
 }
 
-const char *contr2binary(contr x)
+const char *contr2binary(chunk *x)
 {
 	register agent n = 128 * R;
 	static char b[1 + 128 * R];
@@ -361,7 +324,7 @@ const char *contr2binary(contr x)
 }
 
 __attribute__((always_inline)) inline
-penny bound(const agent *a, const agent *n, const contr c, const contr r, const contr d, \
+penny bound(const agent *a, const agent *n, const chunk *c, const chunk *r, const chunk *d, \
 	    const agent *s, const agent *cs, const agent *dr, const meter *l, const meter *sp) {
 
 	register agent i, j, k, m = n[N];
@@ -421,61 +384,63 @@ penny bound(const agent *a, const agent *n, const contr c, const contr r, const 
 
 #include <float.h>
 
-void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, const meter *sp, uint64_t *cnt = NULL) {
+void edgecontraction(stack *st, edge e, chunk *c, chunk *r, chunk *d, penny tot, const meter *sp, uint64_t *cnt = NULL) {
 
+	#ifndef CLINK
 	if (!stop) gettimeofday(&t2, NULL);
-	if (stop || (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec > LIMIT) stop = 1;
-	stack cur = *st;
+	if (!clinkset && (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec > LIMITCLINK) { clinkset = 1; clinksol = min; }
+	if (stop || (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec > MAX(LIMIT, LIMITCLINK)) stop = 1;
 	count++;
-	if (cnt) (*cnt)++;
-	if (tot < opt) { sol = cur; bou = opt = tot; }
 	if (stop) return;
+	#endif
+	stack cur = *st;
+	if (cnt) (*cnt)++;
 
-	register edge f, j;
 	register agent v1, v2;
+	if (tot < min) { sol = cur; min = tot; }
 
 	#ifdef CLINK
 	#define GAIN(MER, CUR, V1, V2) ((float)(COST(V1, (MER).dr, (MER).l)) - COST(V1, (CUR).dr, (CUR).l) - COST(V2, (CUR).dr, (CUR).l))
 	float tl, bl = FLT_MAX;
-	__m128i th[R], bh[R];
 	stack tst, bst;
-	edge bf = 0;
+	edge bf = 0, popc = MASKPOPCNT(c, R);
+	//printf("popc = %u\n", popc);
 
-	for (f = 1; f < E + 1; f++)
-		if (!ISSET(c, f) && !ISSET(r, f) && !ISSET(d, f)) {
-			//printf("f = %u (%lu -- %lu)\n", f, X(cur.a, f), Y(cur.a, f));
-			if (!(cur.dr[v1 = X(cur.a, f)] + cur.dr[v2 = Y(cur.a, f)])) continue;
-			if (X(cur.s, v1) + X(cur.s, v2) > CAR || cur.dr[v1] + cur.dr[v2] > MAXDRIVERS) continue;
-			tst = cur;
-			for (j = 0; j < R; j++) th[j] = _mm_setzero_si128();
-			merge(v1, v2, tst.n, tst.s, tst.cs, tst.dr);
-			contract(tst.g, tst.a, tst.n, v1, v2, r, th);
-			tst.l[v1] = minpath(tst.cs + Y(tst.s, v1), X(tst.s, v1), tst.dr[v1], sp);
-			//printcs(tst.s, tst.cs, tst.n, tst.dr, tst.l);
-			tl = GAIN(tst, cur, v1, v2);
-			//printf("f = %u linkage = %f\n", f, tl);
+	chunk tmp[R];
+	memcpy(tmp, c, sizeof(chunk) * R);
+	
+	for (edge a = 0, f = MASKFFS(tmp, R); a < popc; a++, f = MASKCLEARANDFFS(tmp, f, R)) {
+		//printf("f = %u (%lu -- %lu)\n", f, X(cur.a, f), Y(cur.a, f));
+		if (!(cur.dr[v1 = X(cur.a, f)] + cur.dr[v2 = Y(cur.a, f)])) continue;
+		if (X(cur.s, v1) + X(cur.s, v2) > CAR || cur.dr[v1] + cur.dr[v2] > MAXDRIVERS) continue;
+		tst = cur;
+		merge(v1, v2, tst.n, tst.s, tst.cs, tst.dr);
+		tst.l[v1] = minpath(tst.cs + Y(tst.s, v1), X(tst.s, v1), tst.dr[v1], sp);
+		//printcs(tst.s, tst.cs, tst.n, tst.dr, tst.l);
+		tl = GAIN(tst, cur, v1, v2);
+		//printf("f = %u linkage = %f\n", f, tl);
 
-			if (tl < bl) {
-				bf = f;
-				bl = tl;
-				bst = tst;
-				memcpy(bh, th, sizeof(__m128i) * R);
-			}
+		if (tl < bl) {
+			bf = f;
+			bl = tl;
+			bst = tst;
 		}
+	}
 
 	if (bl <= 0) {
 		v1 = X(cur.a, bf);
 		v2 = Y(cur.a, bf);
 		//printf("\nwill contract %u (%lu -- %lu)\n\n", bf, v1, v2);
+		chunk *h = (chunk *)calloc(R, sizeof(chunk));
+		contract(bst.g, bst.a, bst.n, v1, v2, NULL, h);
 		st[1] = bst;
-		SET(r, bf);
-		SET(c, bf);
-		OR(d, bh);
-		edgecontraction(st + 1, bf, c, r, d, tot + COST(v1, st[1].dr, st[1].l) - COST(v1, cur.dr, cur.l) - COST(v2, cur.dr, cur.l), sp);
+		CLEAR(c, bf);
+		MASKANDNOT(c, h, c, R);
+		edgecontraction(st + 1, bf, c, NULL, NULL, tot + COST(v1, st[1].dr, st[1].l) - COST(v1, cur.dr, cur.l) - COST(v2, cur.dr, cur.l), sp, cnt);
 	}
 
 	#else
-	__m128i h[R], rt[R];
+	chunk h[R], rt[R];
 
 	for (f = 1; f < E + 1; f++)
 		if (!ISSET(c, f) && !ISSET(r, f) && !ISSET(d, f)) {
@@ -632,44 +597,6 @@ inline void createedge(edge *g, agent *a, agent v1, agent v2, edge e) {
 	Y(a, e) = v2;
 }
 
-__attribute__((always_inline)) inline
-void driversbfs(const agent *a, const agent *dr, edge *gr, agent *ar) {
-
-	register uint_fast64_t b, i, j, f, r;
-	agent q[N], l[N * N], h[N] = {0};
-
-	__m128i n[R], c[R];;
-	for (i = 0; i < R; i++)
-		c[i] = n[i] = _mm_setzero_si128();
-
-	for (i = 1; i < E + 1; i++) {
-		r = X(a, i);
-		f = l[r * N + h[r]++] = Y(a, i);
-		l[f * N + h[f]++] = r;
-	}
-
-	f = 0;
-	r = D;
-
-	for (i = 0; i < N; i++) if (dr[i]) {
-		q[f++] = i;
-		SET(n, i);
-	}
-
-	f = 0;
-	i = 1;
-	do {
-		SET(c, q[f]);
-		for (j = 0; j < h[q[f]]; j++) {
-			b = l[q[f] * N + j];
-			if (!ISSET(n, b)) { q[r++] = b; SET(n, b); }
-			if (!ISSET(c, b)) createedge(gr, ar, q[f], b, i++);
-		}
-		f++;
-	}
-	while (f != r);
-}
-
 #ifdef METIS
 #include <metis.h>
 
@@ -711,12 +638,12 @@ void graph2csr(const edge *g, agent n, edge m, idx_t *xadj, idx_t *adjncy) {
 }
 
 edge reorderedges(const edge *g, const agent *map, idx_t n, edge m, edge *go, agent *ao, edge *e, \
-		  real_t *tpwgts, real_t *ubvec, idx_t *options) {
+		  real_t *tpwgts, real_t *ubvec, idx_t *minions) {
 
 	idx_t cutsize, part[n], ncon = 1, nparts = 2;
 	idx_t xadj[n + 1], adjncy[2 * m];
 	graph2csr(g, n, m, xadj, adjncy);
-	ROUTINE(&n, &ncon, xadj, adjncy, NULL, NULL, NULL, &nparts, tpwgts, ubvec, options, &cutsize, part);
+	ROUTINE(&n, &ncon, xadj, adjncy, NULL, NULL, NULL, &nparts, tpwgts, ubvec, minions, &cutsize, part);
 	register agent i, j, n2, n1 = 0;
 	for (i = 0; i < n; i++) if (part[i]) n1++;
 	n2 = n - n1;
@@ -727,8 +654,8 @@ edge reorderedges(const edge *g, const agent *map, idx_t n, edge m, edge *go, ag
 		memset(g1, 0, sizeof(edge) * n1 * n1);
 		memset(g2, 0, sizeof(edge) * n2 * n2);
 		splitgraph(g, map, part, g1, n1, &m1, map1, g2, n2, &m2, map2, go, ao, e);
-		if (n1 > 1) reorderedges(g1, map1, n1, m1, go, ao, e, tpwgts, ubvec, options);
-		if (n2 > 1) reorderedges(g2, map2, n2, m2, go, ao, e, tpwgts, ubvec, options);
+		if (n1 > 1) reorderedges(g1, map1, n1, m1, go, ao, e, tpwgts, ubvec, minions);
+		if (n2 > 1) reorderedges(g2, map2, n2, m2, go, ao, e, tpwgts, ubvec, minions);
 	}
 	else for (i = 0; i < n; i++)
 		for (j = i + 1; j < n; j++)
@@ -737,6 +664,15 @@ edge reorderedges(const edge *g, const agent *map, idx_t n, edge m, edge *go, ag
 }
 
 #endif
+
+void completeNet(edge *g, agent *a) {
+
+	register edge e = 1;
+
+	for (int i = 0; i < N; i++)
+		for (int j = i + 1; j < N; j++)
+			createedge(g, a, i, j, e++);
+}
 
 void createScaleFree(edge *g, agent *a) {
 
@@ -856,12 +792,8 @@ int main(int argc, char *argv[]) {
 	free(ds);
 	free(adj);
 
-	//f = fopen("sp.dat", "wb");
-	//fwrite(sp, sizeof(meter), 4 * N * N, f);
-        //fclose(f);
-
-	stack *st = (stack *)aligned_alloc(128, sizeof(stack) * N);
-	if (!st) { puts("Error allocating aligned stack"); exit(1); }
+	stack *st = (stack *)malloc(sizeof(stack) * N);
+	if (!st) { puts("Error allocating stack"); exit(1); }
 	memset(st[0].g, 0, sizeof(edge) * N * N);
 
 	for (i = 0; i < D; i++) st[0].dr[i] = 1;
@@ -892,28 +824,34 @@ int main(int argc, char *argv[]) {
 		X(sg, i) = X(st[0].s, i) = 1;
 		Y(sg, i) = Y(st[0].s, i) = csg[i] = st[0].cs[i] = i;
 		st[0].l[i] = sp[4 * i * N + 2 * i + 1];
-		opt += COST(i, st[0].dr, st[0].l);
+		min += COST(i, st[0].dr, st[0].l);
 		st[0].n[st[0].n[i] = N + i + 1] = i;
 	}
 
-	penny in = bou = opt;
+	penny in = min;
 	init(SEED);
 	#ifdef TWITTER
 	memcpy(st[0].g, g, sizeof(edge) * N * N);
 	memcpy(st[0].a, a, sizeof(agent) * 2 * (E + 1));
 	#else
+	#ifdef NONET
+	completeNet(st[0].g, st[0].a);
+	#else
 	createScaleFree(st[0].g, st[0].a);
 	#endif
+	#endif
 
-	__m128i c[R], d[R], r[R];
-	for (i = 0; i < R; i++)
-		r[i] = c[i] = d[i] = _mm_setzero_si128();
+	chunk *c = (chunk *)malloc(sizeof(chunk) * R);
+	for (dim i = 0; i < DIVBPC(E); i++) c[i] = ~0ULL;
+	if (MODBPC(E)) c[DIVBPC(E)] = (1ULL << MODBPC(E)) - 1;
+	CLEAR(c, 0);
 
 	sol = st[0];
 	gettimeofday(&t1, NULL);
-	edgecontraction(st, 0, c, r, d, opt, sp);
+	edgecontraction(st, 0, c, NULL, NULL, min, sp, NULL);
+	//printcs(sol.s, sol.cs, sol.n, sol.dr, sol.l);
 	gettimeofday(&t2, NULL);
 	free(sp);
-	printf("%u,%llu,%u,%u,%f\n", N + 700, SEED, in, opt, (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
+	printf("%u,%u,%u,%u,%f,%f\n", N, SEED, in, min, ((float)in - min) / in, (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
 	return 0;
 }

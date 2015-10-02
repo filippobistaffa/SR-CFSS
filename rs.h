@@ -32,14 +32,20 @@
 
 #define REORDER
 #define PARALLEL
-#define TWITTER
+//#define TWITTER
 
 #define CLINK
+#define NONET
 
 #ifndef TWITTER
+#ifdef NONET
+#define E (N * (N - 1) / 2)
+#else
 #define N 500
-#define E (K * N - (K * (K + 1)) / 2)
 #define SEED 9872124ULL
+#define E (K * N - (K * (K + 1)) / 2)
+#endif
+//#define LIMITCLINK 1
 #endif
 
 #ifdef METIS
@@ -53,9 +59,6 @@
 #define CREATEMATRIX creatematrix
 #endif
 
-#define D (N * DRIVERPERC / 100)
-#define R (1 + (((E > N ? E : N) - 1) / 128))
-
 #define MEAN(x, y) (((x) + (y)) / 2)
 #define ROUND(type, i) ((type)(i))
 #define POUND(i) ((float)(i) / 100)
@@ -64,28 +67,51 @@
 #define DIST(dx, dy) (sqrt((dx) * (dx) + (dy) * (dy)))
 #define X(v, i) ((v)[2 * (i)])
 #define Y(v, i) ((v)[2 * (i) + 1])
-
-#define OR(x, y) ({ register uint_fast32_t i; for (i = 0; i < R; i++) (x)[i] = _mm_or_si128((x)[i], (y)[i]); })
-#define ANDNOT(x, y) ({ register uint_fast32_t i; for (i = 0; i < R; i++) (x)[i] = _mm_andnot_si128((y)[i], (x)[i]); })
-#define ISSET(x, i) ((_mm_cvtsi128_si64(((i) >> 6) & 1 ? _mm_srli_si128((x)[(i) >> 7], 8) : (x)[(i) >> 7]) >> ((i) & 63)) & 1)
 #define CONTAINS(n, i) ((n)[(i)] <= (n)[N] + N)
 
-#define SET(x, i) ({ (x)[(i) >> 7] = _mm_or_si128((x)[(i) >> 7], _mm_set_epi64x((((i) >> 6) & 1) ? 1ULL << ((i) & 63) : 0, \
-                     (((i) >> 6) & 1) ? 0 : 1ULL << ((i) & 63))); })
+#define D (N * DRIVERPERC / 100)
+#define R CEILBPC(MAX(E, N))
 
-#define CLEAR(x, i) ({ (x)[(i) >> 7] = _mm_andnot_si128(_mm_set_epi64x((((i) >> 6) & 1) ? 1ULL << ((i) & 63) : 0, \
-                       (((i) >> 6) & 1) ? 0 : 1ULL << ((i) & 63)), (x)[(i) >> 7]); })
+#define MAX(_x, _y) ((_x) > (_y) ? (_x) : (_y))
+#define MIN(_x, _y) ((_x) < (_y) ? (_x) : (_y))
+
+#define CEIL(X, Y) (1 + (((X) - 1) / (Y)))
+#define DIVBPC(x) ((x) / BITSPERCHUNK)
+#define MODBPC(x) ((x) % BITSPERCHUNK)
+#define CEILBPC(x) CEIL(x, BITSPERCHUNK)
+
+#define SET(V, I) ((V)[DIVBPC(I)] |= 1ULL << MODBPC(I)) // Row-major SET
+#define CLEAR(V, I) ((V)[DIVBPC(I)] &= ~(1ULL << MODBPC(I))) // Row-major CLEAR
+#define ISSET(V, I) ((V)[DIVBPC(I)] >> MODBPC(I) & 1)
+
+#define MASKOR(A, B, R, C) do { register dim _i; for (_i = 0; _i < (C); _i++) (R)[_i] = (A)[_i] | (B)[_i]; } while (0)
+#define MASKAND(A, B, R, C) do { register dim _i; for (_i = 0; _i < (C); _i++) (R)[_i] = (A)[_i] & (B)[_i]; } while (0)
+#define MASKXOR(A, B, R, C) do { register dim _i; for (_i = 0; _i < (C); _i++) (R)[_i] = (A)[_i] ^ (B)[_i]; } while (0)
+#define MASKANDNOT(A, B, R, C) do { register dim _i; for (_i = 0; _i < (C); _i++) (R)[_i] = (A)[_i] & ~(B)[_i]; } while (0)
+#define MASKNOTAND(A, B, R, C) do { register dim _i; for (_i = 0; _i < (C); _i++) (R)[_i] = ~(A)[_i] & (B)[_i]; } while (0)
+#define MASKNOTANDNOT(A, B, R, C) do { register dim _i; for (_i = 0; _i < (C); _i++) (R)[_i] = ~(A)[_i] & ~(B)[_i]; } while (0)
+#define MASKPOPCNT(A, C) ({ register dim _i, _c = 0; for (_i = 0; _i < (C); _i++) _c += __builtin_popcountll((A)[_i]); _c; })
+#define MASKFFS(A, C) ({ register dim _i = 0, _ffs = 0; register const chunk *_buf = (A); \
+			 while (!(*_buf) && _i < (C)) { _ffs += BITSPERCHUNK; _buf++; _i++; } \
+			 if (_i == (C)) _ffs = 0; else _ffs += __builtin_ffsll(*_buf) - 1; _ffs; })
+#define MASKCLEARANDFFS(A, B, C) ({ CLEAR(A, B); MASKFFS(A, C); })
+#define MASKFFSANDCLEAR(A, C) ({ register dim _idx = MASKFFS(A, C); CLEAR(A, _idx); _idx; })
 
 typedef struct { place p; dist f; } item;
 typedef struct { agent x; agent y; } agentxy;
 typedef struct { agent a; agent d; meter p; } agentpath;
 
-typedef struct __attribute__((aligned(128))) {
+typedef struct {
 	edge g[N * N];
 	agent a[2 * (E + 1)], n[2 * N + 1];
 	agent s[2 * N], cs[N], dr[N];
 	meter l[N];
 } stack;
+
+typedef union {
+	__m128i m;
+	uint64_t buf[2];
+} un;
 
 #include "crc32.h"
 #include "random.h"
