@@ -1,8 +1,7 @@
-#include "rs.h"
+#include "sr.h"
 
 uint64_t count;
 static uint64_t split[E];
-static uint64_t ccount[N];
 
 penny opt;
 static stack sol;
@@ -750,8 +749,6 @@ void createScaleFree(edge *g, agent *a) {
 		}
 	}
 }
-
-#include "kernel.i"
 
 int main(int argc, char *argv[]) {
 
