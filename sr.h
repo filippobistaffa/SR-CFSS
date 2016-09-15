@@ -1,5 +1,5 @@
-#define CAR 5
-#define SEATS (CAR - 1)
+#ifndef SRCFSS_H_
+#define SRCFSS_H_
 
 #include <omp.h>
 #include <math.h>
@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+
+#include "params.h"
 #include "types.h"
 
 #define IDX "dat/idx.dat"
@@ -15,25 +17,15 @@
 #define XY "dat/xy.dat"
 #define SS "dat/ss.dat"
 
+#define CAR 5
+#define SEATS (CAR - 1)
+
 #define R5 2520
 #define R4 90
 #define R3 6
 
-#define CARCOST 100
-#define TICKETCOST 300
-#define PENNYPERLITRE 130
-#define METERSPERLITRE 15000
-#define MAXDRIVERS 1
-#define EPSILON 0.05
-
-#define REORDER
-//#define PARALLEL
-//#define NAIVE
-
 #ifndef TWITTER
 #define E (K * N - (K * (K + 1)) / 2)
-#define DRIVERPERC 10
-#define MINGAIN 1
 #endif
 
 #ifdef METIS
@@ -78,3 +70,5 @@ typedef struct __attribute__((aligned(128))) {
 //#include "crc32.h"
 #include "random.h"
 #include "iqsort.h"
+
+#endif /* SRCFSS_H_ */
