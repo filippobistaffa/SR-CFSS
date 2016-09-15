@@ -41,14 +41,6 @@
 #define TOLERANCE 1
 #endif
 
-#if defined PARALLEL
-#define CREATEMATRIX creatematrixdslyce
-#elif defined NAIVE
-#define CREATEMATRIX creatematrixnaive
-#else
-#define CREATEMATRIX creatematrix
-#endif
-
 #define D (N * DRIVERPERC / 100)
 #define R (1 + (((E > N ? E : N) - 1) / 128))
 
