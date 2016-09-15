@@ -6,6 +6,6 @@
 #define EPSILON 0.05
 #define MINGAIN 1
 
-#define REORDER
+//#define REORDER
 //#define PARALLEL
 //#define NAIVE

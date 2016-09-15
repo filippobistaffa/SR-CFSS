@@ -72,3 +72,4 @@ else
 fi
 
 ./sr
+#echo "" >> original.log
