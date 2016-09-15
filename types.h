@@ -10,4 +10,3 @@ typedef uint16_t penny;
 typedef uint16_t edge;
 typedef uint32_t id;
 typedef float dist;
-
