@@ -4,7 +4,6 @@
 #define METERSPERLITRE 15000
 #define MAXDRIVERS 1
 #define EPSILON 0.05
-#define DRIVERPERC 10
 #define MINGAIN 1
 
 #define REORDER
