@@ -4,7 +4,7 @@ SR-CFSS is a Branch and Bound algorithm for Social Ridesharing. SR-CFSS has been
 
 Download
 ----------
-CFSS requires `g++` to compile, and does not require any external library to execute. In order to employ Twitter as network topology, `java` must be installed on the system, and the [Twitter GitHub repository](https://github.com/filippobistaffa/twitter) must be `git clone`'d inside SR-CFSS's root directory.
+SR-CFSS requires `g++` to compile, and does not require any external library to execute. In order to employ Twitter as network topology, `java` must be installed on the system, and the [Twitter GitHub repository](https://github.com/filippobistaffa/twitter) must be `git clone`'d inside SR-CFSS's root directory.
 
 Execution
 ----------
@@ -17,3 +17,7 @@ SR-CFSS must be executed by means of the [`sr.sh`](https://github.com/filippobis
 -s	Seed
 -m	Parameter m of the Barabasi-Albert model (optional, default m = 1)
 ```
+
+Acknowledgements
+----------
+SR-CFSS employs the [GeoLife dataset by Microsoft Research](http://research.microsoft.com/en-us/projects/geolife) presented by Yu Zheng, Quannan Li, Yukun Chen, Xing Xie, and Wei-Ying Ma in “[Understanding mobility based on GPS data](https://www.microsoft.com/en-us/research/publication/understanding-mobility-based-on-gps-data)”, Proceedings of the 10th ACM conference on Ubiquitous Computing (Ubicomp), pages 312−321, 2008, ACM press.
