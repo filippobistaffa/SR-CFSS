@@ -344,8 +344,8 @@ void connect(const agent *a, agent *n, const contr c, const contr r, const contr
 	} while (--m);
 }
 
-const char *contr2binary(contr x)
-{
+const char *contr2binary(contr x) {
+
 	register agent n = 128 * R;
 	static char b[1 + 128 * R];
 	b[0] = '\0';
@@ -444,7 +444,7 @@ penny bound(const agent *a, const agent *n, const contr c, const contr r, const 
 	return b;
 }
 
-void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, const meter *sp, uint64_t *cnt) {
+void srcfss(stack *st, edge e, contr c, contr r, contr d, penny tot, const meter *sp, uint64_t *cnt) {
 
 	count++;
 	stack cur = *st;
@@ -469,8 +469,7 @@ void edgecontraction(stack *st, edge e, contr c, contr r, contr d, penny tot, co
 			st[1].l[v1] = minpath(st[1].cs + Y(st[1].s, v1), X(st[1].s, v1), st[1].dr[v1], sp);
 			SET(c, f);
 			OR(d, h);
-			edgecontraction(st + 1, f, c, rt, d, tot + COST(v1, st[1].dr, st[1].l) - COST(v1, cur.dr, cur.l) - COST(v2, cur.dr, cur.l), \
-			sp, cnt ? cnt : split + f - 1);
+			srcfss(st + 1, f, c, rt, d, tot + COST(v1, st[1].dr, st[1].l) - COST(v1, cur.dr, cur.l) - COST(v2, cur.dr, cur.l), sp, cnt ? cnt : split + f - 1);
 			CLEAR(c, f);
 			ANDNOT(d, h);
 		}
@@ -889,37 +888,8 @@ int main(int argc, char *argv[]) {
 		r[i] = c[i] = d[i] = _mm_setzero_si128();
 
 	sol = st[0];
-	edgecontraction(st, 0, c, r, d, opt, sp, NULL);
-	size_t maxc = split[0];
-	for (i = 1; i < E; i++) maxc = split[i] > maxc ? split[i] : maxc;
-	//printcs(sol.s, sol.cs, sol.n, sol.dr, sol.l);
-	payoff x[N];
-	gettimeofday(&t1, NULL);
-	agent deg[N] = { 0 };
-
-	for (i = 0; i < N; i++)
-		for (j = i + 1; j < N; j++)
-			if (st[0].g[i * N + j]) { deg[i]++; deg[j]++; }
-
-	if (sol.n[N] != N) i = computekernel(x, EPSILON, st[0].a, st[0].dr, sp, deg);
-	gettimeofday(&t2, NULL);
-	//double dt = (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec;
-	//printf("%u,%u,%u,%u,%llu,%u,%u,%zu,%zu,%u,%f\n", N, sol.n[N], D, MINGAIN, SEED, in, opt, count, maxc, i, dt);
-
-	/*
-	printf("Total cost with ridesharing = %.2f£\n", POUND(opt));
-	printf("%zu CSs\n", count);
-
-	for (i = 0; i < E; i++)
-		if (split[i]) printf("%zu CSs (%.2f%%)\n", split[i], (double)split[i] * 100 / (count - 1));
-
-	puts("Gains:");
-	for (i = 0; i < sizeof(thrs) / sizeof(penny); i++)
-		if (gains[i]) printf("[%06.2f£, %06.2f£] = %zu\n", POUND(!i ? 0 : thrs[i - 1]), POUND(thrs[i]), gains[i]);
-
-	printf("Checksum = %u (size = %zu bytes)\n", crc32(sp, sizeof(dist) * 4 * N * N), sizeof(dist) * 4 * N * N);
-	printf("%f seconds\n", (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
-	*/
+	srcfss(st, 0, c, r, d, opt, sp, NULL);
+	printcs(sol.s, sol.cs, sol.n, sol.dr, sol.l);
 
 	free(stops);
 	free(idx);

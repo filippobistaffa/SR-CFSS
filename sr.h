@@ -10,10 +10,10 @@
 #include <sys/time.h>
 #include "types.h"
 
-#define IDX "idx.dat"
-#define ADJ "adj.dat"
-#define XY "xy.dat"
-#define SS "ss.dat"
+#define IDX "dat/idx.dat"
+#define ADJ "dat/adj.dat"
+#define XY "dat/xy.dat"
+#define SS "dat/ss.dat"
 
 #define R5 2520
 #define R4 90
@@ -25,19 +25,15 @@
 #define METERSPERLITRE 15000
 #define MAXDRIVERS 1
 #define EPSILON 0.05
-#define K 2
 
 #define REORDER
-#define TWITTER
 //#define PARALLEL
 //#define NAIVE
 
 #ifndef TWITTER
-#define N 25
 #define E (K * N - (K * (K + 1)) / 2)
 #define DRIVERPERC 10
 #define MINGAIN 1
-#define SEED 4568ULL
 #endif
 
 #ifdef METIS
