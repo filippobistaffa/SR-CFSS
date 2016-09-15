@@ -10,8 +10,10 @@ Execution
 ----------
 SR-CFSS must be executed by means of the [`sr.sh`](https://github.com/filippobistaffa/SR-CFSS/blob/master/sr.sh) script, i.e.,
 ```
-./sr.sh -n <#agents> -s <seed>
+./sr.sh -t <scalefree|twitter> -n <#agents> -s <seed>
 
+-t	Network topology (either scalefree or twitter)
 -n	Number of agents
 -s	Seed
+-m	Parameter m of the Barabasi-Albert model (optional, default m = 1)
 ```
