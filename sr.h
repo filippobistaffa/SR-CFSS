@@ -54,7 +54,7 @@ typedef struct __attribute__((aligned(128))) {
 	edge g[N * N];
 	agent a[2 * (E + 1)], n[2 * N + 1];
 	agent s[2 * N], cs[N], dr[N];
-	chunk c[C], r[C], d[C];
+	chunk c[C], r[C];
 	meter l[N], *sp;
 } stack;
 
