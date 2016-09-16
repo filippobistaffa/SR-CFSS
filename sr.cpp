@@ -435,7 +435,14 @@ penny bound(const stack *st) {
 
 void srcfss(stack *st, penny cur) {
 
+	#ifdef TREEDOT
+	st->id = count;
+	printf("ID = %zu\n", st->id);
+	if (st->id) fprintf(st->dot, "\t%zu -> %zu;\n", (st - 1)->id, st->id);
+	printcs(st);
+	#endif
 	count++;
+
 	if (cur < min) { min = cur; sol = *st; }
 
 	#ifdef LIMIT
@@ -878,9 +885,21 @@ int main(int argc, char *argv[]) {
 	memcpy(st->a, ao, sizeof(agent) * 2 * (E + 1));
 	#endif
 
+	#ifdef TREEDOT
+	st->dot = fopen(TREEDOT, "w+");
+	fprintf(st->dot, "digraph TREE {\n");
+	#endif
+
 	sol = *st;
 	srcfss(st, min);
+	#ifdef TREEDOT
+	printf("SOLUTION = %zu\n", sol.id);
+	#endif
 	printcs(&sol);
+	#ifdef TREEDOT
+	fprintf(st->dot, "}");
+	fclose(st->dot);
+	#endif
 	free(st->sp);
 	free(stops);
 	free(idx);

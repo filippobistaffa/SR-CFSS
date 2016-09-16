@@ -14,6 +14,10 @@
 #include "params.h"
 #include "types.h"
 
+#ifdef TREEDOT
+#include <fstream>
+#endif
+
 #define IDX "dat/idx.dat"
 #define ADJ "dat/adj.dat"
 #define XY "dat/xy.dat"
@@ -56,6 +60,10 @@ typedef struct __attribute__((aligned(128))) {
 	agent s[2 * N], cs[N], dr[N];
 	chunk c[C], r[C];
 	meter l[N], *sp;
+	#ifdef TREEDOT
+	size_t id;
+	FILE *dot;
+	#endif
 } stack;
 
 //#include "crc32.h"
