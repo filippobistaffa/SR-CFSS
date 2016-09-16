@@ -7,33 +7,7 @@ static stack sol;
 struct timeval t1, t2;
 static agent csg[N], sg[2 * N];
 
-/*void printpath(agent *q, agent *s, agent *p) {
-
-	register int8_t i;
-
-	if (*s == 1 && *q >= N) {
-		*p = *q;
-		printf("r[%zu]=sp[(2*c[0])*2*N+", count++);
-		for (i = 2 * SEATS - 1; i >= 0; i--) {
-			printf("(2*c[%u]%s)]+", *(p - i) % N, (*(p - i) < N ? "" : "+1"));
-			printf("sp[(2*c[%u]%s)*2*N+", *(p - i) % N, (*(p - i) < N ? "" : "+1"));
-		}
-		printf("(2*c[0]+1)];\n");
-	}
-	else for (i = 0; i < *s; i++) {
-		*p = q[i];
-		if (*p < N) {
-			memcpy(q + *s, q, sizeof(agent) * (*(s + 1) = *s));
-			*(q + *s + i) += N;
-		}
-		else {
-			*(s + 1) = *s - 1;
-			memcpy(q + *s, q, sizeof(agent) * i);
-			memcpy(q + *s + i, q + i + 1, sizeof(agent) * (*s - i - 1));
-		}
-		printpath(q + *s, s + 1, p + 1);
-	}
-}*/
+// MemCpy with aligned memory
 
 __attribute__((always_inline)) inline
 void memcpyaligned(void* dest, const void* src, const size_t size) {
@@ -70,6 +44,8 @@ void memcpyaligned(void* dest, const void* src, const size_t size) {
 	    "r"(src), "r"(dest), "r"(size) :
 	    "rsi", "rdi", "rbx", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "memory");
 }
+
+// Minimum of an array using SSE
 
 __attribute__((always_inline)) inline
 void minsse(meter *b, agent n) {
@@ -132,6 +108,8 @@ void minsse(meter *b, agent n) {
 	*b = tmp[0];
 }
 
+// Find optimal path given a coalition
+
 __attribute__((always_inline)) inline
 meter minpath(agent *c, agent n, agent dr, const meter *sp) {
 
@@ -172,6 +150,8 @@ meter minpath(agent *c, agent n, agent dr, const meter *sp) {
 
 	return min;
 }
+
+// Merge coalitions of v1 and v2
 
 __attribute__((always_inline)) inline
 void merge(stack *st, agent v1, agent v2) {
@@ -235,6 +215,8 @@ void contract(stack *st, agent v1, agent v2) {
 	while (--m);
 }
 
+// Print coalition structure
+
 void printcs(const stack *st) {
 
 	const agent *p = st->n + N + 1;
@@ -248,6 +230,8 @@ void printcs(const stack *st) {
                 printf("} (%um) = %.2f£\n", st->l[i], POUND(COST(i, st->dr, st->l)));
         } while (--m);
 }
+
+// Print coalition structure in lexicographic order
 
 void printcsordered(const stack *st) {
 
@@ -268,8 +252,8 @@ void printcsordered(const stack *st) {
 		k++;
 	} while (--m);
 
-	#define ltx(a, b) ((*(a)).x < (*(b)).x)
-	QSORT(coal, ct, k, ltx);
+	#define LTX(a, b) ((*(a)).x < (*(b)).x)
+	QSORT(coal, ct, k, LTX);
 
 	for (i = 0; i < k; i++) {
 		printf("{ ");
@@ -392,12 +376,7 @@ penny bound(const stack *st) {
 		cars[i] = (st->dr[i] > 0);
 	} while (--m);
 
-	//printbuf(tst.cs, N, "tst.cs");
-
 	connect(&tst, cars);
-
-	//printbuf(tst.cs, N, "tst.cs");
-
 	p = tst.n + N + 1;
 	m = tst.n[N];
 
@@ -405,10 +384,6 @@ penny bound(const stack *st) {
 	else {
 		agent cy, ck, tr = 0, ccx = X(tst.s, i);
 		penny pc, b1 = 0, b2 = 0;
-
-		//printbuf(tst.cs, N, "tst.cs");
-		//printbuf(tst.s, 2 * N, "tst.s");
-		//printcs(&tst);
 
 		for (agent j = 0; j < ccx; j++)
 			for (agent k = 0; k < X(st->s, cy = tst.cs[Y(tst.s, i) + j]); k++) {
@@ -422,8 +397,6 @@ penny bound(const stack *st) {
 
 		agent as = cars[i] * CAR;
 		b += cars[i] * CARCOST + ((tr > as) ? (tr - as) * TICKETCOST : 0);
-
-		//printf("tr = %u as = %u b = %u\n", tr, as, b);
 
 		if (cars[i]) {
 			for (agent j = 0; j < tr; j++) {
@@ -442,8 +415,8 @@ penny bound(const stack *st) {
 				mp[j].p /= 2;
 			}
 
-			#define ltmp(a, b) ( ((*(a)).d != (*(b)).d) ? ((*(a)).d > (*(b)).d) : ((*(a)).p < (*(b)).p) )
-			QSORT(agentpath, mp, tr, ltmp);
+			#define LTMP(a, b) ( ((*(a)).d != (*(b)).d) ? ((*(a)).d > (*(b)).d) : ((*(a)).p < (*(b)).p) )
+			QSORT(agentpath, mp, tr, LTMP);
 
 			for (agent j = 0; j < (tr < as ? tr : as); j++) {
 				pc = PATHCOST(mp[j].p);
@@ -461,9 +434,6 @@ penny bound(const stack *st) {
 void srcfss(stack *st, penny cur) {
 
 	count++;
-	//printcs(st);
-	//puts("");
-
 	if (cur < min) { min = cur; sol = *st; }
 
 	#ifdef LIMIT
@@ -472,8 +442,6 @@ void srcfss(stack *st, penny cur) {
 		if ((double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec > LIMIT) stop = true;
 	}
 	#endif
-
-	//printf("bound = %u min = %u\n", bound(st), min);
 
 	if (bound(st) >= min - MINGAIN) return;
 
@@ -506,6 +474,8 @@ void srcfss(stack *st, penny cur) {
 		srcfss(st + 1, cur + COST(v1, st[1].dr, st[1].l) - COST(v1, st->dr, st->l) - COST(v2, st->dr, st->l));
 	}
 }
+
+// A* sub-rountines
 
 __attribute__((always_inline)) inline
 void reheapdown(item *q, place root, place bottom) {
@@ -563,6 +533,8 @@ item dequeue(item *q, place n) {
 	return temp;
 }
 
+// A* algorithm
+
 meter astar(place start, place dest, place nodes, const id *idx, const place *adj, const dist *d) {
 
 	uint8_t *cset = (uint8_t *)calloc(nodes, sizeof(uint8_t));
@@ -615,6 +587,8 @@ meter astar(place start, place dest, place nodes, const id *idx, const place *ad
 	free(g);
 	return 0;
 }
+
+// Shuffle the content of an array
 
 void shuffle(void *array, size_t n, size_t size) {
 
@@ -684,13 +658,13 @@ void driversbfs(const agent *a, const agent *dr, edge *gr, agent *ar) {
 void splitgraph(const edge *g, const agent *map, const idx_t *part, edge *g1, agent n1, edge *m1, agent *map1,
 		edge *g2, agent n2, edge *m2, agent *map2, edge *go, agent *ao, edge *e) {
 
-	register agent i, j, p, n = n1 + n2, a = 0, b = 0;
+	register agent p, n = n1 + n2, a = 0, b = 0;
 	agent inv[n];
 
-	for (i = 0; i < n; i++) inv[i] = part[i] ? a++ : b++;
-	for (i = 0; i < n; i++) {
+	for (agent i = 0; i < n; i++) inv[i] = part[i] ? a++ : b++;
+	for (agent i = 0; i < n; i++) {
 		((p = part[i]) ? map1 : map2)[inv[i]] = map[i];
-		for (j = i + 1; j < n; j++)
+		for (agent j = i + 1; j < n; j++)
 			if (g[i * n + j]) {
 				if (p ^ part[j]) createedge(go, ao, map[i], map[j], (*e)++);
 				else {
@@ -746,7 +720,9 @@ edge reorderedges(const edge *g, const agent *map, idx_t n, edge m, edge *go, ag
 
 #endif
 
-void createScaleFree(edge *g, agent *a) {
+#ifndef TWITTER
+
+void scalefree(edge *g, agent *a) {
 
 	uint_fast8_t deg[N] = {0};
 	register uint_fast64_t d, i, j, h, k = 1, q, t = 0;
@@ -783,24 +759,9 @@ void createScaleFree(edge *g, agent *a) {
 	}
 }
 
+#endif
+
 int main(int argc, char *argv[]) {
-
-	/*
-
-	register agent i;
-	agent *queue = malloc(sizeof(agent) * 2 * M * M);
-	agent *size = malloc(sizeof(agent) * 2 * M);
-	agent *path = malloc(sizeof(agent) * 2 * M);
-
-	for (i = 0; i < M; i++) queue[i] = i + 1;
-	size[0] = M;
-	printpath(queue, size, path);
-
-	free(queue);
-	free(size);
-	free(path);
-
-	*/
 
 	FILE *f;
 	place nodes, edges;
@@ -887,13 +848,12 @@ int main(int argc, char *argv[]) {
 	ONES(st->r, E + 1, C);
 	CLEAR(st->r, 0);
 
-	//penny in = opt;
 	init(SEED);
 	#ifdef TWITTER
 	memcpy(st->g, g, sizeof(edge) * N * N);
 	memcpy(st->a, a, sizeof(agent) * 2 * (E + 1));
 	#else
-	createScaleFree(st->g, st->a);
+	scalefree(st->g, st->a);
 	#endif
 
 	#ifdef REORDER
@@ -910,7 +870,7 @@ int main(int argc, char *argv[]) {
 	for (agent i = 0; i < N; i++) map[i] = i;
 	reorderedges(st->g, map, N, E, go, ao, &e, tpwgts, &ubvec, options);
 	#else
-	//driversbfs(st->a, st->dr, go, ao);
+	driversbfs(st->a, st->dr, go, ao);
 	#endif
 	memcpy(st->g, go, sizeof(edge) * N * N);
 	memcpy(st->a, ao, sizeof(agent) * 2 * (E + 1));
@@ -919,11 +879,10 @@ int main(int argc, char *argv[]) {
 	sol = *st;
 	srcfss(st, min);
 	printcs(&sol);
-	printf("count = %zu\n", count);
-
 	free(st->sp);
 	free(stops);
 	free(idx);
 	free(xy);
+
 	return 0;
 }

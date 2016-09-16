@@ -71,5 +71,5 @@ else
 	rm $tmp
 fi
 
-./sr >> bound.log
-echo "" >> bound.log
+./sr #>> bound.log
+#echo "" >> bound.log
