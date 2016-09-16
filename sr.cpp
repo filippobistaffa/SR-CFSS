@@ -7,6 +7,18 @@ static stack sol;
 struct timeval t1, t2;
 static agent csg[N], sg[2 * N];
 
+// Print content of buffer
+
+#include <iostream>
+template <typename type>
+__attribute__((always_inline)) inline
+void printbuf(const type *buf, unsigned n, const char *name) {
+
+	printf("%s = [ ", name);
+	while (n--) std::cout << *(buf++) << " ";
+	printf("]\n");
+}
+
 // MemCpy with aligned memory
 
 __attribute__((always_inline)) inline
@@ -295,16 +307,6 @@ void graph2png(const agent *a, const agent *n, const contr c, const contr r, con
 }
 
 #endif
-
-#include <iostream>
-template <typename type>
-__attribute__((always_inline)) inline
-void printbuf(const type *buf, unsigned n, const char *name) {
-
-	printf("%s = [ ", name);
-	while (n--) std::cout << *(buf++) << " ";
-	printf("]\n");
-}
 
 // Contract all available edges
 
