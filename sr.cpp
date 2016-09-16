@@ -2,6 +2,7 @@
 
 penny min;
 bool stop;
+size_t count;
 static stack sol;
 struct timeval t1, t2;
 static agent csg[N], sg[2 * N];
@@ -260,8 +261,8 @@ void printcsordered(const stack *st) {
 	do {
 		ct[k].a = i = *(p++);
 		ct[k].x = 0;
-		#define lt(a, b) (*(a) < *(b))
-		QSORT(agent, cst + Y(st->s, i), j = X(st->s, i), lt);
+		#define LT(a, b) (*(a) < *(b))
+		QSORT(agent, cst + Y(st->s, i), j = X(st->s, i), LT);
 		do ct[k].x = (ct[k].x * N) + cst[Y(st->s, i) + j - 1];
 		while (--j);
 		k++;
@@ -311,19 +312,33 @@ void graph2png(const agent *a, const agent *n, const contr c, const contr r, con
 
 #endif
 
+#include <iostream>
+template <typename type>
+__attribute__((always_inline)) inline
+void printbuf(const type *buf, unsigned n, const char *name) {
+
+	printf("%s = [ ", name);
+	while (n--) std::cout << *(buf++) << " ";
+	printf("]\n");
+}
+
 // Contract all available edges
 
 __attribute__((always_inline)) inline
 void connect(stack *st, agent *cars) {
 
-	register agent m = st->n[N];
-	register const agent *p = st->n + N + 1;
-	register agent *q = (agent *)malloc(sizeof(agent) * N);
-	register agent *l = (agent *)malloc(sizeof(agent) * N * N);
-	register agent *h = (agent *)calloc(N, sizeof(agent));
-	register edge popc = MASKPOPCNT(st->c, C);
+	agent m = st->n[N];
+	const agent *p = st->n + N + 1;
+	agent *q = (agent *)malloc(sizeof(agent) * N);
+	agent *l = (agent *)malloc(sizeof(agent) * N * N);
+	agent *h = (agent *)calloc(N, sizeof(agent));
 
-	for (edge i = 0, e = MASKFFS(st->c, C); i < popc; i++, e = MASKCLEARANDFFS(st->c, e, C)) {
+	chunk tmp[C];
+	memcpy(tmp, st->c, sizeof(chunk) * C);
+	MASKAND(tmp, st->r, tmp, C);
+	edge popc = MASKPOPCNT(tmp, C);
+
+	for (edge i = 0, e = MASKFFS(tmp, C); i < popc; i++, e = MASKCLEARANDFFS(tmp, e, C)) {
 		agent v1 = X(st->a, e);
 		agent v2 = l[v1 * N + h[v1]++] = Y(st->a, e);
 		l[v2 * N + h[v2]++] = v1;
@@ -338,10 +353,13 @@ void connect(stack *st, agent *cars) {
 			for (agent j = 0; j < h[q[f]]; j++) {
 				agent b = l[q[f] * N + j];
 				if (i != b && CONTAINS(st->n, b)) {
-					merge(st, i, b);
-					cars[i] += cars[b];
+					//printf("merge %u %u\n", i, b);
 					q[e++] = b;
+					//printbuf(st->cs, N, "cs");
+					merge(st, i, b);
+					//printbuf(st->cs, N, "cs");
 					m--;
+					cars[i] += cars[b];
 				}
 			}
 			f++;
@@ -374,17 +392,26 @@ penny bound(const stack *st) {
 		cars[i] = (st->dr[i] > 0);
 	} while (--m);
 
+	//printbuf(tst.cs, N, "tst.cs");
+
 	connect(&tst, cars);
+
+	//printbuf(tst.cs, N, "tst.cs");
+
 	p = tst.n + N + 1;
 	m = tst.n[N];
 
 	do if (X(tst.s, i = *(p++)) == 1) b += COST(i, st->dr, st->l);
 	else {
-		agent cy, ck, tr = 0, ccx = X(st->s, i);
+		agent cy, ck, tr = 0, ccx = X(tst.s, i);
 		penny pc, b1 = 0, b2 = 0;
 
+		//printbuf(tst.cs, N, "tst.cs");
+		//printbuf(tst.s, 2 * N, "tst.s");
+		//printcs(&tst);
+
 		for (agent j = 0; j < ccx; j++)
-			for (agent k = 0; k < X(st->s, cy = st->cs[Y(tst.s, i) + j]); k++) {
+			for (agent k = 0; k < X(st->s, cy = tst.cs[Y(tst.s, i) + j]); k++) {
 				ck = st->cs[Y(st->s, cy) + k];
 				if (st->dr[ck]) b1 += PATHCOST(st->l[ck]);
 				mp[tr].a = ck;
@@ -396,19 +423,21 @@ penny bound(const stack *st) {
 		agent as = cars[i] * CAR;
 		b += cars[i] * CARCOST + ((tr > as) ? (tr - as) * TICKETCOST : 0);
 
+		//printf("tr = %u as = %u b = %u\n", tr, as, b);
+
 		if (cars[i]) {
 			for (agent j = 0; j < tr; j++) {
 				for (agent k = 0; k < tr; k++) {
 					X(et, k) = st->sp[2 * mp[j].a * 2 * N + 2 * mp[k].a];
 					Y(et, k) = st->sp[2 * mp[j].a * 2 * N + 2 * mp[k].a + 1];
 				}
-				QSORT(meter, et, 2 * tr, lt);
+				QSORT(meter, et, 2 * tr, LT);
 				mp[j].p += et[0] + (st->dr[mp[j].a] ? 0 : et[1]);
 				for (agent k = 0; k < tr; k++) {
 					X(et, k) = st->sp[(2 * mp[j].a + 1) * 2 * N + 2 * mp[k].a];
 					Y(et, k) = st->sp[(2 * mp[j].a + 1) * 2 * N + 2 * mp[k].a + 1];
 				}
-				QSORT(meter, et, 2 * tr, lt);
+				QSORT(meter, et, 2 * tr, LT);
 				mp[j].p += et[0] + (st->dr[mp[j].a] ? 0 : et[1]);
 				mp[j].p /= 2;
 			}
@@ -431,6 +460,7 @@ penny bound(const stack *st) {
 
 void srcfss(stack *st, penny cur) {
 
+	count++;
 	//printcs(st);
 	//puts("");
 
@@ -442,40 +472,37 @@ void srcfss(stack *st, penny cur) {
 		if ((double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec > LIMIT) stop = true;
 	}
 	#endif
-		puts("ciao34");
 
-	//if (bound(st) > min - MINGAIN) return;
+	//printf("bound = %u min = %u\n", bound(st), min);
 
-	chunk tmp[C];
+	if (bound(st) >= min - MINGAIN) return;
+
+	chunk tmp[C], rt[C];
 	memcpy(tmp, st->c, sizeof(chunk) * C);
-	register edge popc = MASKPOPCNT(tmp, C);
-		puts("ciao2");
+	MASKAND(tmp, st->r, tmp, C);
+	edge popc = MASKPOPCNT(tmp, C);
 
 	for (edge i = 0, e = MASKFFS(tmp, C); !stop && i < popc; i++, e = MASKCLEARANDFFS(tmp, e, C)) {
-
-		printf("%u\n", e);
 
 		agent v1 = X(st->a, e);
 		agent v2 = Y(st->a, e);
 
-		puts("ciao");
-
-		printf("%u %u\n\n", v1, v2);
-
 		// At least one of the two coalitions must be a car
 		if (!(st->dr[v1] + st->dr[v2])) continue;
-		puts("ciao321");
+
+		memcpy(rt, st->r, sizeof(chunk) * C);
+		CLEAR(st->r, st->g[v1 * N + v2]);
+		CLEAR(tmp, st->g[v1 * N + v2]);
 
 		// Must not exceed the number of seats and the maximum number of drivers
 		if (X(st->s, v1) + X(st->s, v2) > CAR || st->dr[v1] + st->dr[v2] > MAXDRIVERS) continue;
 
-
-		puts("ciao1");
-
 		CLEAR(st->c, st->g[v1 * N + v2]);
 		st[1] = st[0];
+		memcpy(st[1].r, rt, sizeof(chunk) * C);
 		merge(st + 1, v1, v2);
 		contract(st + 1, v1, v2);
+		st[1].l[v1] = minpath(st[1].cs + Y(st[1].s, v1), X(st[1].s, v1), st[1].dr[v1], st->sp);
 		srcfss(st + 1, cur + COST(v1, st[1].dr, st[1].l) - COST(v1, st->dr, st->l) - COST(v2, st->dr, st->l));
 	}
 }
@@ -857,6 +884,8 @@ int main(int argc, char *argv[]) {
 
 	ONES(st->c, E + 1, C);
 	CLEAR(st->c, 0);
+	ONES(st->r, E + 1, C);
+	CLEAR(st->r, 0);
 
 	//penny in = opt;
 	init(SEED);
@@ -890,6 +919,7 @@ int main(int argc, char *argv[]) {
 	sol = *st;
 	srcfss(st, min);
 	printcs(&sol);
+	printf("count = %zu\n", count);
 
 	free(st->sp);
 	free(stops);
