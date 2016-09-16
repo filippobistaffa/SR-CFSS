@@ -232,12 +232,12 @@ void contract(stack *st, agent v1, agent v2) {
 void printcs(const stack *st) {
 
 	const agent *p = st->n + N + 1;
-        agent i, j, m = st->n[N];
+        agent m = st->n[N];
 
 	do {
-		i = *(p++);
+		agent i = *(p++);
                 printf("{ ");
-                for (j = 0; j < X(st->s, i); j++)
+                for (agent j = 0; j < X(st->s, i); j++)
                 	printf("%s%u%s%s ", i == st->cs[Y(st->s, i) + j] ? "<" : "", st->cs[Y(st->s, i) + j], i == st->cs[Y(st->s, i) + j] ? ">" : "", j < st->dr[i] ? "*" : "");
                 printf("} (%um) = %.2f£\n", st->l[i], POUND(COST(i, st->dr, st->l)));
         } while (--m);
@@ -285,7 +285,7 @@ static char* names[] = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
 void graph2png(const agent *a, const agent *n, const contr c, const contr r, const contr d, const char* filename) {
 
 	register const agent *p = n + N + 1;
-	register agent i, m = n[N];
+	register agent m = n[N];
 	GVC_t *gvc = gvContext();
 	Agraph_t* g = agopen("test", Agstrictundirected, 0);
 	agsafeset(g, "overlap", "false", "");
@@ -294,7 +294,7 @@ void graph2png(const agent *a, const agent *n, const contr c, const contr r, con
 	do { nodes[*p] = agnode(g, names[*p], 1); p++; }
 	while (--m);
 
-	for (i = 1; i < E + 1; i++) if (!ISSET(c, i) && !ISSET(d, i)) {
+	for (agent i = 1; i < E + 1; i++) if (!ISSET(c, i) && !ISSET(d, i)) {
 		Agedge_t *e = agedge(g, nodes[X(a, i)], nodes[Y(a, i)], "", 1);
 		if (ISSET(r, i)) agsafeset(e, "color", "red", "");
 	}
