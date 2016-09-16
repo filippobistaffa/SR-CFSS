@@ -427,7 +427,7 @@ penny bound(const stack *st) {
 
 			b += b1 > b2 ? b1 : b2;
 		}
-		else b += tr * TICKETCOST;
+		//else b += tr * TICKETCOST;
 	} while (--m);
 
 	return b;
