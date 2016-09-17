@@ -183,6 +183,7 @@ void merge(stack *st, agent v1, agent v2) {
 	max = Y(st->s, max);
 	Y(st->s, v1) = min = Y(st->s, min);
 	st->dr[v1] = da + db;
+	st->dr[v2] = 0;
 	agent c[b];
 	X(st->s, v1) = a + b;
 	memcpy(c, st->cs + max, sizeof(agent) * b);
