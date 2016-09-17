@@ -257,7 +257,6 @@ void printcsordered(const stack *st) {
 	do {
 		ct[k].a = i = *(p++);
 		ct[k].x = 0;
-		#define LT(a, b) (*(a) < *(b))
 		QSORT(agent, cst + Y(st->s, i), j = X(st->s, i), LT);
 		do ct[k].x = (ct[k].x * N) + cst[Y(st->s, i) + j - 1];
 		while (--j);

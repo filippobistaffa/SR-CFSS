@@ -4,6 +4,11 @@
 #define MAX(X, Y) ((X) > (Y) ? (X) : (Y))
 #define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
 
+#define LT(X, Y) (*(X) < *(Y))
+#define LE(X, Y) (*(X) <= *(Y))
+#define GT(X, Y) (*(X) > *(Y))
+#define GE(X, Y) (*(X) >= *(Y))
+
 #define X(V, I) ((V)[2 * (I)])
 #define Y(V, I) ((V)[2 * (I) + 1])
 
