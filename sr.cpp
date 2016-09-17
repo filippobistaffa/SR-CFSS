@@ -894,6 +894,7 @@ int main(int argc, char *argv[]) {
 	#ifdef TREEDOT
 	st->dot = fopen(TREEDOT, "w+");
 	fprintf(st->dot, "digraph TREE {\n");
+	fprintf(st->dot, "\tnode [color = none; shape = plaintext, width = 0.2, height = 0.2];\n");
 	#endif
 
 	// Solve
@@ -905,7 +906,7 @@ int main(int argc, char *argv[]) {
 
 	#ifdef TREEDOT
 	printf("SOLUTION = %zu\n", sol.id);
-	fprintf(st->dot, "\t%zu [style=filled, fillcolor = green];\n", sol.id);
+	fprintf(st->dot, "\t%zu [shape = circle, style = filled, fillcolor = green];\n", sol.id);
 	#endif
 	printcs(&sol);
 
