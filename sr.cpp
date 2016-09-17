@@ -905,6 +905,7 @@ int main(int argc, char *argv[]) {
 
 	#ifdef TREEDOT
 	printf("SOLUTION = %zu\n", sol.id);
+	fprintf(st->dot, "\t%zu [style=filled, fillcolor = green];\n", sol.id);
 	#endif
 	printcs(&sol);
 
