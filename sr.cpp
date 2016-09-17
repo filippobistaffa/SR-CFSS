@@ -857,6 +857,8 @@ int main(int argc, char *argv[]) {
 	ONES(st->r, E + 1, C);
 	CLEAR(st->r, 0);
 
+	// Create graph
+
 	init(SEED);
 	#ifdef TWITTER
 	memcpy(st->g, g, sizeof(edge) * N * N);
@@ -864,6 +866,8 @@ int main(int argc, char *argv[]) {
 	#else
 	scalefree(st->g, st->a);
 	#endif
+
+	// Reorder (eventually)
 
 	#ifdef REORDER
 	edge go[N * N] = {0};
@@ -890,12 +894,20 @@ int main(int argc, char *argv[]) {
 	fprintf(st->dot, "digraph TREE {\n");
 	#endif
 
+	// Solve
+
 	sol = *st;
 	srcfss(st, min);
+
+	// Print solution
+
 	#ifdef TREEDOT
 	printf("SOLUTION = %zu\n", sol.id);
 	#endif
 	printcs(&sol);
+
+	// Free data structures
+
 	#ifdef TREEDOT
 	fprintf(st->dot, "}");
 	fclose(st->dot);
