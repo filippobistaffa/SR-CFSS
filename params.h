@@ -10,3 +10,5 @@
 //#define REORDER
 //#define PARALLEL
 //#define NAIVE
+
+//#define TREEDOT "tree.dot"
