@@ -623,43 +623,46 @@ inline void createedge(edge *g, agent *a, agent v1, agent v2, edge e) {
 	Y(a, e) = v2;
 }
 
-/*__attribute__((always_inline)) inline
-void driversbfs(const agent *a, const agent *dr, edge *gr, agent *ar) {
+__attribute__((always_inline)) inline
+void driversbfs(const stack *st, edge *gr, agent *ar) {
 
-	register uint_fast64_t b, i, j, f, r;
-	agent q[N], l[N * N], h[N] = {0};
+	agent *q = (agent *)malloc(sizeof(agent) * N);
+	agent *l = (agent *)malloc(sizeof(agent) * N * N);
+	agent *h = (agent *)calloc(N, sizeof(agent));
+	chunk n[C] = {0}, c[C] = {0};
 
-	__m128i n[R], c[R];;
-	for (i = 0; i < R; i++)
-		c[i] = n[i] = _mm_setzero_si128();
-
-	for (i = 1; i < E + 1; i++) {
-		r = X(a, i);
-		f = l[r * N + h[r]++] = Y(a, i);
-		l[f * N + h[f]++] = r;
+	for (edge e = 1; e < E + 1; e++) {
+		agent v1 = X(st->a, e);
+		agent v2 = l[v1 * N + h[v1]++] = Y(st->a, e);
+		l[v2 * N + h[v2]++] = v1;
 	}
 
-	f = 0;
-	r = D;
+	agent f = 0;
+	agent r = D;
 
-	for (i = 0; i < N; i++) if (dr[i]) {
+	for (agent i = 0; i < N; i++) if (st->dr[i]) {
 		q[f++] = i;
 		SET(n, i);
 	}
 
 	f = 0;
-	i = 1;
+	agent i = 1;
+
 	do {
 		SET(c, q[f]);
-		for (j = 0; j < h[q[f]]; j++) {
-			b = l[q[f] * N + j];
-			if (!ISSET(n, b)) { q[r++] = b; SET(n, b); }
-			if (!ISSET(c, b)) createedge(gr, ar, q[f], b, i++);
+		for (agent j = 0; j < h[q[f]]; j++) {
+			agent b = l[q[f] * N + j];
+			if (!SET(n, b)) { q[r++] = b; SET(n, b); }
+			if (!SET(c, b)) createedge(gr, ar, q[f], b, i++);
 		}
 		f++;
 	}
 	while (f != r);
-}*/
+
+	free(q);
+	free(l);
+	free(h);
+}
 
 #ifdef METIS
 #include <metis.h>
