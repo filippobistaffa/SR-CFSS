@@ -605,8 +605,7 @@ void shuffle(void *array, size_t n, size_t size) {
 	uint8_t *arr = (uint8_t *)array;
 
 	if (n > 1) {
-		size_t i;
-		for (i = 0; i < n - 1; ++i) {
+		for (size_t i = 0; i < n - 1; ++i) {
 			size_t rnd = (size_t) rand();
 			size_t j = i + rnd / (RAND_MAX / (n - i) + 1);
 			memcpy(tmp, arr + j * size, size);
@@ -692,11 +691,10 @@ void splitgraph(const edge *g, const agent *map, const idx_t *part, edge *g1, ag
 void graph2csr(const edge *g, agent n, edge m, idx_t *xadj, idx_t *adjncy) {
 
 	xadj[n] = 2 * m;
-	register uint_fast64_t i, j, h = 0, k = 0;
 
-	for (i = 0; i < n; i++) {
+	for (agent i = 0, h = 0, k = 0; i < n; i++) {
 		xadj[h++] = k;
-		for (j = 0; j < n; j++)
+		for (agent j = 0; j < n; j++)
 			if (g[i * n + j]) adjncy[k++] = j;
 	}
 }
