@@ -452,7 +452,9 @@ void srcfss(stack *st, penny cur) {
 	}
 	#endif
 
+	#ifdef BOUND
 	if (bound(st) >= min - MINGAIN) return;
+	#endif
 
 	chunk tmp[C], rt[C];
 	memcpy(tmp, st->c, sizeof(chunk) * C);
