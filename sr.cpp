@@ -280,7 +280,7 @@ void printpk(const stack *st, FILE *pk) {
 
 	do {
 		agent i = *(p++);
-		fprintf(pk, "%s%u", st->dr[i] ? "*" : "", i);
+		fprintf(pk, "%s%u", st->dr[i] ? "*" : "", st->cs[Y(st->s, i)]);
                 for (agent j = 1; j < X(st->s, i); j++)
 			fprintf(pk, " %u", st->cs[Y(st->s, i) + j]);
                 fprintf(pk, "\n");
