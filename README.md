@@ -10,13 +10,14 @@ Execution
 ----------
 SR-CFSS must be executed by means of the [`sr.sh`](https://github.com/filippobistaffa/SR-CFSS/blob/master/sr.sh) script, i.e.,
 ```
-./sr.sh -t <scalefree|twitter> -n <#agents> -s <seed> [-m <barabasi_m>] [-d <drivers_%>]
+./sr.sh -t <scalefree|twitter> -n <#agents> -s <seed> [-m <barabasi_m>] [-d <drivers_%>] [-p <output_file>]
 
 -t	Network topology (either scalefree or twitter)
 -n	Number of agents
 -s	Seed
 -d	Drivers' percentage (optional, default d = 10)
 -m	Parameter m of the Barabasi-Albert model (optional, default m = 1)
+-p	Outputs a solution file formatted for PK
 ```
 
 Search Tree Render

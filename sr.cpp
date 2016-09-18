@@ -244,6 +244,26 @@ void printcs(const stack *st) {
         } while (--m);
 }
 
+// Print coalition structure in PK format
+
+#ifdef PK
+
+void printpk(const stack *st, FILE *pk) {
+
+	const agent *p = st->n + N + 1;
+        agent m = st->n[N];
+
+	do {
+		agent i = *(p++);
+		fprintf(pk, "%u", i);
+                for (agent j = 1; j < X(st->s, i); j++)
+			fprintf(pk, " %u", st->cs[Y(st->s, i) + j]);
+                fprintf(pk, "\n");
+        } while (--m);
+}
+
+#endif
+
 // Print coalition structure in lexicographic order
 
 void printcsordered(const stack *st) {
@@ -912,6 +932,14 @@ int main(int argc, char *argv[]) {
 	printf("SOLUTION = %zu\n", sol.id);
 	fprintf(st->dot, "\t%zu [shape = circle, style = filled, fillcolor = green];\n", sol.id);
 	#endif
+
+	#ifdef PK
+	FILE *pk = fopen(PK, "w+");
+	fprintf(pk, "%u\n%u\n%u\n", N, CAR, SEED);
+	printpk(&sol, pk);
+	fclose(pk);
+	#endif
+
 	printcs(&sol);
 
 	// Free data structures
