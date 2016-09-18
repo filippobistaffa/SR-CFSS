@@ -248,6 +248,31 @@ void printcs(const stack *st) {
 
 #ifdef PK
 
+#define LTDR(X, Y) (dr[*(X)] == dr[*(Y)] ? (*(X)) < (*(Y)) : dr[*(X)] > dr[*(Y)])
+#define LEDR(X, Y) (dr[*(X)] == dr[*(Y)] ? (*(X)) <= (*(Y)) : dr[*(X)] > dr[*(Y)])
+
+void printadj(const agent *a, const agent *dr, FILE *pk) {
+
+	agent l[N * N];
+
+	for (agent i = 0; i < N; i++) l[i * N] = 0;
+	edge e = E;
+
+	do {
+		l[a[0] * N + (l[a[0] * N]++) + 1] = a[1];
+		l[a[1] * N + (l[a[1] * N]++) + 1] = a[0];
+		a += 2;
+	} while (--e);
+
+	for (; e < N; e++) {
+		QSORT(agent, l + e * N + 1, l[e * N], LTDR);
+		fprintf(pk, "%u", l[e * N]);
+                for (agent j = 1; j <= l[e * N]; j++)
+			fprintf(pk, " %u", l[e * N + j]);
+                fprintf(pk, "\n");
+	}
+}
+
 void printpk(const stack *st, FILE *pk) {
 
 	const agent *p = st->n + N + 1;
@@ -936,6 +961,7 @@ int main(int argc, char *argv[]) {
 	#ifdef PK
 	FILE *pk = fopen(PK, "w+");
 	fprintf(pk, "%u\n%u\n%u\n", N, CAR, SEED);
+	printadj(st->a + 2, st->dr, pk);
 	printpk(&sol, pk);
 	fclose(pk);
 	#endif
