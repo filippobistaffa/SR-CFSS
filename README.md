@@ -10,7 +10,7 @@ Execution
 ----------
 SR-CFSS must be executed by means of the [`sr.sh`](https://github.com/filippobistaffa/SR-CFSS/blob/master/sr.sh) script, i.e.,
 ```
-./sr.sh -t <scalefree|twitter> -n <#agents> -s <seed> [-m <barabasi_m>] [-d <drivers_%>] [-p <output_file>]
+./sr.sh -t <scalefree|twitter> -n <#agents> -s <seed> [-m <barabasi_m>] [-d <drivers_%>] [-p <output>]
 
 -t	Network topology (either scalefree or twitter)
 -n	Number of agents
