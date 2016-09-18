@@ -667,6 +667,7 @@ void shuffle(void *array, size_t n, size_t size) {
 
 inline void createedge(edge *g, agent *a, agent v1, agent v2, edge e) {
 
+	//printf("%u -- %u\n", v1, v2);
 	g[v1 * N + v2] = g[v2 * N + v1] = e;
 	X(a, e) = v1;
 	Y(a, e) = v2;
