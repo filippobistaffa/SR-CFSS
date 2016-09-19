@@ -965,9 +965,9 @@ int main(int argc, char *argv[]) {
 	printadj(st->a + 2, st->dr, pk);
 	printpk(&sol, pk);
 	fclose(pk);
-	#endif
-
+	#else
 	printcs(&sol);
+	#endif
 
 	// Free data structures
 
