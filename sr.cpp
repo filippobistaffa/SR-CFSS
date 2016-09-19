@@ -827,6 +827,7 @@ int main(int argc, char *argv[]) {
 	FILE *f;
 	place nodes, edges;
 	uint16_t pool;
+	unsigned seed = atoi(argv[1]);
 
 	f = fopen(XY, "rb");
 	fread(&nodes, sizeof(place), 1, f);
@@ -862,7 +863,7 @@ int main(int argc, char *argv[]) {
 	fread(stops, sizeof(place), 2 * pool, f);
 	fclose(f);
 
-	srand(SEED);
+	srand(seed);
 	shuffle(stops, pool, sizeof(place) * 2);
 	stops = (place *)realloc(stops, sizeof(place) * 2 * N);
 	dist *ds = (dist *)calloc(nodes * nodes, sizeof(dist));
@@ -911,7 +912,7 @@ int main(int argc, char *argv[]) {
 
 	// Create graph
 
-	init(SEED);
+	init(seed);
 	#ifdef TWITTER
 	memcpy(st->g, g, sizeof(edge) * N * N);
 	memcpy(st->a, a, sizeof(agent) * 2 * (E + 1));
@@ -928,7 +929,7 @@ int main(int argc, char *argv[]) {
 	idx_t options[METIS_NOPTIONS];
 	METIS_SetDefaultOptions(options);
 	options[METIS_OPTION_OBJTYPE] = METIS_OBJTYPE_CUT;
-	options[METIS_OPTION_SEED] = SEED;
+	options[METIS_OPTION_SEED] = seed;
 	real_t tpwgts[2] = {0.5, 0.5}, ubvec = TOLERANCE;
 	agent map[N];
 	edge e = 1;
@@ -961,7 +962,7 @@ int main(int argc, char *argv[]) {
 
 	#ifdef PK
 	FILE *pk = fopen(PK, "w+");
-	fprintf(pk, "%u\n%u\n%u\n", N, CAR, SEED);
+	fprintf(pk, "%u\n%u\n%u\n", N, CAR, seed);
 	printadj(st->a + 2, st->dr, pk);
 	printpk(&sol, pk);
 	fclose(pk);

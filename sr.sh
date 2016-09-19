@@ -74,7 +74,7 @@ fi
 echo -e "[\033[01;33m CC \033[0m] SR-CFSS"
 
 if [[ $t == "scalefree" ]] ; then
-	g++ -DN=$n -DK=$m -DSEED=$s -DDRIVERPERC=$d $pk -Wall -march=native -O0 -funroll-loops -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 *.c *.cpp -lm -o sr
+	g++ -DN=$n -DK=$m -DDRIVERPERC=$d $pk -Wall -march=native -O0 -funroll-loops -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 *.c *.cpp -lm -o sr
 else
 	tmp=`mktemp`
 	java -Xmx4000m -cp .:$wg/* ReduceGraph $basename $n $s > $tmp
@@ -82,5 +82,4 @@ else
 	rm $tmp
 fi
 
-./sr #>> bound.log
-#echo "" >> bound.log
+./sr $s
