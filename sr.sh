@@ -49,6 +49,13 @@ while getopts ":t:n:s:d:m:p:" o; do
 		;;
 	p)
 		p=${OPTARG}
+		touch $p 2> /dev/null
+		rc=$?
+		if [[ $rc != 0 ]]
+		then
+			echo -e "${red}Unable to create $p${nc}"
+			exit
+		fi
 		pk=-DPK=\"${p}\"
 		;;
 	\?)
