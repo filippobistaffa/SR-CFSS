@@ -15,8 +15,8 @@ SR-CFSS must be executed by means of the [`sr.sh`](https://github.com/filippobis
 -t	Network topology (either scalefree or twitter)
 -n	Number of agents
 -s	Seed
--d	Drivers' percentage (optional, default d = 10)
--m	Parameter m of the Barabasi-Albert model (optional, default m = 1)
+-d	Drivers' percentage (optional, default d = 20)
+-m	Parameter m of the Barabasi-Albert model (optional, default m = 2)
 -p	Outputs a solution file formatted for PK
 ```
 
