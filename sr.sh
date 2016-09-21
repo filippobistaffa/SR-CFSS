@@ -77,8 +77,8 @@ if [[ $t == "scalefree" ]] ; then
 	g++ -DN=$n -DK=$m -DDRIVERPERC=$d $pk -Wall -march=native -O0 -funroll-loops -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 *.c *.cpp -lm -o sr
 else
 	tmp=`mktemp`
-	java -Xmx4000m -cp .:$wg/* ReduceGraph $basename $n $s > $tmp
-	g++ -DTWITTER $pk -Wall -march=native -Ofast -funroll-loops -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 -include types.h -include $tmp *.c *.cpp -lm -o sr
+	java -Xmx4000m -cp .:$wg/* ReduceGraph $basename $n $s | grep -v WARN > $tmp
+	g++ -DTWITTER -DDRIVERPERC=$d $pk -Wall -march=native -O0 -funroll-loops -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 -include types.h -include $tmp *.c *.cpp -lm -o sr
 	rm $tmp
 fi
 
