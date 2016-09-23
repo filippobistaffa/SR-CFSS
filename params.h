@@ -15,5 +15,9 @@
 // Enable approximate version of SR-CFSS
 //#define LIMIT 10
 
+#if !defined(BOUND) && defined(LIMIT)
+#error "BOUND must be enabled in the approximate version of SR-CFSS"
+#endif
+
 // Update bound considering all the frontier (approximate version)
 #define COMPLETEFRONTIER

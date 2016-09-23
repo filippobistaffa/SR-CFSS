@@ -75,11 +75,16 @@ echo -e "[\033[01;33m CC \033[0m] SR-CFSS"
 
 if [[ $t == "scalefree" ]] ; then
 	g++ -DN=$n -DK=$m -DDRIVERPERC=$d $pk -Wall -march=native -O0 -funroll-loops -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 *.c *.cpp -lm -o sr
+	rc=$?
 else
 	tmp=`mktemp`
 	java -Xmx4000m -cp .:$wg/* ReduceGraph $basename $n $s | grep -v WARN > $tmp
 	g++ -DTWITTER -DDRIVERPERC=$d $pk -Wall -march=native -O0 -funroll-loops -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 -include types.h -include $tmp *.c *.cpp -lm -o sr
+	rc=$?
 	rm $tmp
 fi
 
-time -p ./sr $s
+if [[ $rc == 0 ]]
+then
+	time -p ./sr $s
+fi
