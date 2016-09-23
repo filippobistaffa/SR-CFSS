@@ -14,3 +14,6 @@
 
 // Enable approximate version of SR-CFSS
 //#define LIMIT 10
+
+// Update bound considering all the frontier (approximate version)
+#define COMPLETEFRONTIER

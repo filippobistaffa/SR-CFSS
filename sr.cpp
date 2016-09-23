@@ -498,9 +498,9 @@ void srcfss(stack *st, penny cur) {
 		gettimeofday(&t2, NULL);
 		if ((double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec > LIMIT) stop = true;
 	}
-	// Comment to update bound considering all the remaining frontier
+	#ifndef COMPLETEFRONTIER
 	else return;
-	//
+	#endif
 	#endif
 
 	#ifdef BOUND
