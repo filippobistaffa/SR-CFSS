@@ -11,3 +11,6 @@
 //#define PARALLEL
 
 //#define TREEDOT "tree.dot"
+
+// Enable approximate version of SR-CFSS
+//#define TREEDOT "tree.dot"

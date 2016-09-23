@@ -1,6 +1,9 @@
 #include "sr.h"
 
 penny min;
+#ifdef LIMIT
+penny bou;
+#endif
 bool stop;
 size_t count;
 static stack sol;
@@ -495,10 +498,18 @@ void srcfss(stack *st, penny cur) {
 		gettimeofday(&t2, NULL);
 		if ((double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec > LIMIT) stop = true;
 	}
+	// Comment to update bound considering all the remaining frontier
+	else return;
+	//
 	#endif
 
 	#ifdef BOUND
-	if (bound(st) >= min - MINGAIN) return;
+	const penny b = bound(st);
+	#ifdef LIMIT
+	if (stop) { if (b < bou) bou = b; return; }
+	else
+	#endif
+	if (b >= min - MINGAIN) return;
 	#endif
 
 	chunk tmp[C], rt[C];
