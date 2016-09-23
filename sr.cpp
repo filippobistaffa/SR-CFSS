@@ -962,7 +962,12 @@ int main(int argc, char *argv[]) {
 	// Solve
 
 	sol = *st;
+	#ifdef LIMIT
+	penny bou = bound(st);
+	#endif
+	gettimeofday(&t1, NULL);
 	srcfss(st, min);
+	gettimeofday(&t2, NULL);
 
 	// Print solution
 
