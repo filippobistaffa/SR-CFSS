@@ -32,7 +32,9 @@ unflatten -f -l3 TREEDOT | dot -Tpng -o PNGFILE
 ```
 where `TREEDOT` is the generated DOT file and `PNGFILE` is the desired output PNG file.
 ![Example search tree](http://i.imgur.com/mZNSg62.png)
-The ID of each coalition structure (i.e., the labels of the nodes) are printed during the execution of SR-CFSS. The optimal solution is highlighted in green.
+The ID of each coalition structure (i.e., the labels of the nodes) are printed during the execution of SR-CFSS.
+
+The optimal solution is highlighted in green.
 
 Acknowledgements
 ----------
