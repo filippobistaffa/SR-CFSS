@@ -8,7 +8,7 @@ m=2					# Default m = 2
 basename="twitter/net/twitter-2010"	# Twitter files must be in "twitter/net" subdir and have twitter-2010.* filenames
 wg="twitter/wg"				# Place WebGraph libraries in "twitter/wg" subdir
 
-usage() { echo -e "Usage: $0 -t <scalefree|twitter> -n <#agents> -s <seed> [-m <barabasi_m>] [-d <drivers_%>]\n-t\tNetwork topology (either scalefree or twitter)\n-n\tNumber of agents\n-s\tSeed\n-d\tDrivers' percentage (optional, default d = 20)\n-m\tParameter m of the Barabasi-Albert model (optional, default m = 2)" 1>&2; exit 1; }
+usage() { echo -e "Usage: $0 -t <scalefree|twitter> -n <#agents> -s <seed> [-m <barabasi_m>] [-d <drivers_%>] [-p <output_file>]\n-t\tNetwork topology (either scalefree or twitter)\n-n\tNumber of agents\n-s\tSeed\n-d\tDrivers' percentage (optional, default d = 20)\n-m\tParameter m of the Barabasi-Albert model (optional, default m = 2)\n-p\tOutputs a solution file formatted for PK" 1>&2; exit 1; }
 
 while getopts ":t:n:s:d:m:p:" o; do
 	case "${o}" in
@@ -47,6 +47,17 @@ while getopts ":t:n:s:d:m:p:" o; do
 			usage
 		fi
 		;;
+	p)
+		p=${OPTARG}
+		touch $p 2> /dev/null
+		rc=$?
+		if [[ $rc != 0 ]]
+		then
+			echo -e "${red}Unable to create $p${nc}"
+			exit
+		fi
+		pk=-DPK=\"${p}\"
+		;;
 	\?)
 		echo -e "${red}-$OPTARG is not a valid option!${nc}\n"
 		usage
@@ -63,12 +74,12 @@ fi
 echo -e "[\033[01;33m CC \033[0m] SR-CFSS"
 
 if [[ $t == "scalefree" ]] ; then
-	g++ -DN=$n -DK=$m -DDRIVERPERC=$d -Wall -march=native -O0 -funroll-loops -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 *.c *.cpp -lm -o sr
+	g++ -DN=$n -DK=$m -DDRIVERPERC=$d $pk -Wall -march=native -O0 -funroll-loops -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 *.c *.cpp -lm -o sr
 	rc=$?
 else
 	tmp=`mktemp`
 	java -Xmx4000m -cp .:$wg/* ReduceGraph $basename $n $s | grep -v WARN > $tmp
-	g++ -DTWITTER -DDRIVERPERC=$d -Wall -march=native -O0 -funroll-loops -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 -include types.h -include $tmp *.c *.cpp -lm -o sr
+	g++ -DTWITTER -DDRIVERPERC=$d $pk -Wall -march=native -O0 -funroll-loops -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 -include types.h -include $tmp *.c *.cpp -lm -o sr
 	rc=$?
 	rm $tmp
 fi

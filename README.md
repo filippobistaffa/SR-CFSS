@@ -8,16 +8,31 @@ SR-CFSS requires `g++` to compile, and does not require any external library to 
 
 Execution
 ----------
-SR-CFSS must be executed by means of the [`sr.sh`](https://github.com/filippobistaffa/SR-CFSS/blob/bound/sr.sh) script, i.e.,
+SR-CFSS must be executed by means of the [`sr.sh`](https://github.com/filippobistaffa/SR-CFSS/blob/master/sr.sh) script, i.e.,
 ```
-./sr.sh -t <scalefree|twitter> -n <#agents> -s <seed> [-m <barabasi_m>] [-d <drivers_%>]
+./sr.sh -t <scalefree|twitter> -n <#agents> -s <seed> [-m <barabasi_m>] [-d <drivers_%>] [-p <output>]
 
 -t	Network topology (either scalefree or twitter)
 -n	Number of agents
 -s	Seed
 -d	Drivers' percentage (optional, default d = 20)
 -m	Parameter m of the Barabasi-Albert model (optional, default m = 2)
+-p	Outputs a solution file formatted for PK
 ```
+
+Search Tree Render
+----------
+SR-CFSS can generate a [DOT](http://www.graphviz.org/content/dot-language) file that represents the search tree explored during the execution. In order to generate such file, `#define` the `TREEDOT` constant as the path of the output DOT file inside [`params.h`](https://github.com/filippobistaffa/SR-CFSS/blob/master/params.h), e.g.,
+```
+#define TREEDOT "tree.dot"
+```
+To render such file as a PNG image, `dot` (part of the `graphviz` suite) must be installed in the system. Then, execute
+```
+unflatten -f -l3 TREEDOT | dot -Tpng -o PNGFILE
+```
+where `TREEDOT` is the generated DOT file and `PNGFILE` is the desired output PNG file.
+![Example search tree](http://i.imgur.com/mZNSg62.png)
+The ID of each coalition structure (i.e., the labels of the nodes) are printed during the execution of SR-CFSS. The optimal solution is highlighted in green.
 
 Acknowledgements
 ----------
