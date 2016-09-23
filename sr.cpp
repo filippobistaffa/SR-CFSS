@@ -984,6 +984,10 @@ int main(int argc, char *argv[]) {
 	fclose(pk);
 	#else
 	printcs(&sol);
+	#ifdef LIMIT
+	printf("Solution = %.2f£\n", 0.01 * min);
+	printf("Bound = %.2f£\n", 0.01 * bou);
+	#endif
 	#endif
 
 	// Free data structures
