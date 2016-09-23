@@ -82,4 +82,4 @@ else
 	rm $tmp
 fi
 
-./sr $s
+time -p ./sr $s
