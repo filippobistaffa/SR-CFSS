@@ -8,7 +8,7 @@ bool stop;
 size_t count;
 static stack sol;
 struct timeval t1, t2;
-static agent csg[N], sg[2 * N];
+static agent drg[N], csg[N], sg[2 * N];
 
 // Print content of buffer
 
@@ -418,6 +418,7 @@ penny bound(const stack *st) {
 	agentpath mp[N];
 	meter et[2 * N];
 
+	memcpy(tst.dr, drg, sizeof(agent) * N);
 	memcpy(tst.cs, csg, sizeof(agent) * N);
 	memcpy(tst.s, sg, sizeof(agent) * 2 * N);
 
@@ -906,6 +907,7 @@ int main(int argc, char *argv[]) {
 
 	memset(st->dr + D, 0, sizeof(agent) * (N - D));
 	shuffle(st->dr, N, sizeof(agent));
+	memcpy(drg, st->dr, N * sizeof(agent));
 	st->n[N] = N;
 
 	for (agent i = 0; i < N; i++) {
