@@ -986,6 +986,7 @@ int main(int argc, char *argv[]) {
 	fclose(pk);
 	#else
 	printcs(&sol);
+	printf("Visited nodes = %zu\n", count);
 	printf("Solution = %.2f£\n", 0.01 * min);
 	#ifdef LIMIT
 	printf("Bound = %.2f£\n", 0.01 * bou);
