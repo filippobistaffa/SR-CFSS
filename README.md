@@ -8,7 +8,7 @@ SR-CFSS requires `g++` to compile, and does not require any external library to 
 
 Execution
 ----------
-SR-CFSS must be executed by means of the [`sr.sh`](https://github.com/filippobistaffa/SR-CFSS/blob/master/sr.sh) script, i.e.,
+SR-CFSS must be executed by means of the [`sr.sh`](sr.sh) script, i.e.,
 ```
 ./sr.sh -t <scalefree|twitter> -n <#agents> -s <seed> [-m <barabasi_m>] [-d <drivers_%>] [-p <output>]
 
@@ -22,7 +22,7 @@ SR-CFSS must be executed by means of the [`sr.sh`](https://github.com/filippobis
 
 Search Tree Render
 ----------
-SR-CFSS can generate a [DOT](http://www.graphviz.org/content/dot-language) file that represents the search tree explored during the execution. In order to generate such file, `#define` the `TREEDOT` constant as the path of the output DOT file inside [`params.h`](https://github.com/filippobistaffa/SR-CFSS/blob/master/params.h), e.g.,
+SR-CFSS can generate a [DOT](http://www.graphviz.org/content/dot-language) file that represents the search tree explored during the execution. In order to generate such file, `#define` the `TREEDOT` constant as the path of the output DOT file inside [`params.h`](params.h), e.g.,
 ```
 #define TREEDOT "tree.dot"
 ```
