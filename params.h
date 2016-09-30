@@ -1,3 +1,6 @@
+// Maximum coalition size
+#define K 5
+
 #define CARCOST 100
 #define TICKETCOST 300
 #define PENNYPERLITRE 130

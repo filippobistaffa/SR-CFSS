@@ -24,7 +24,7 @@ void printbuf(const type *buf, unsigned n, const char *name) {
 
 // MemCpy with aligned memory
 
-__attribute__((always_inline)) inline
+/*__attribute__((always_inline)) inline
 void memcpyaligned(void* dest, const void* src, const size_t size) {
 
 	asm("mov %0, %%rsi\n\t"
@@ -58,113 +58,7 @@ void memcpyaligned(void* dest, const void* src, const size_t size) {
 	    "jnz 1b\n\t" ::
 	    "r"(src), "r"(dest), "r"(size) :
 	    "rsi", "rdi", "rbx", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "memory");
-}
-
-// Minimum of an array using SSE
-
-__attribute__((always_inline)) inline
-void minsse(meter *b, agent n) {
-
-	register __m128i tmp, min = _mm_set1_epi32(UINT_MAX);
-	register meter *buf = b;
-
-	// tmp input until "buf" reaches 16 byte alignment
-	while (((unsigned long)buf) % 16 != 0 && n > 0) {
-		// Load the next uint into the tmp buffer
-		tmp = _mm_set1_epi32(*buf);
-		min = _mm_min_epu32(min, tmp);
-		buf++;
-		n--;
-	}
-
-	// use 64 byte prefetch for quadruple quads
-	while (n >= 16) {
-		__builtin_prefetch(buf + 64, 0, 0);
-		tmp = _mm_load_si128((__m128i*)buf);
-		min = _mm_min_epu32(min, tmp);
-		buf += 4;
-		tmp = _mm_load_si128((__m128i*)buf);
-		min = _mm_min_epu32(min, tmp);
-		buf += 4;
-		tmp = _mm_load_si128((__m128i*)buf);
-		min = _mm_min_epu32(min, tmp);
-		buf += 4;
-		tmp = _mm_load_si128((__m128i*)buf);
-		min = _mm_min_epu32(min, tmp);
-		buf += 4;
-		n -= 16;
-	}
-
-	// work through aligned buffers
-	while (n >= 4) {
-		tmp = _mm_load_si128((__m128i*)buf);
-		min = _mm_min_epu32(min, tmp);
-		buf += 4;
-		n -= 4;
-	}
-
-	// work through the rest < 4 samples
-	while (n > 0) {
-		// Load the next uint into the tmp buffer
-		tmp = _mm_set1_epi32(*buf);
-		min = _mm_min_epu32(min, tmp);
-		buf++;
-		n--;
-	}
-
-	// Find min value through shuffle tricks
-
-	tmp = min;
-	tmp = _mm_shuffle_epi32(tmp, _MM_SHUFFLE(2, 3, 0, 1));
-	tmp = _mm_min_epu32(tmp, min);
-	min = tmp;
-	tmp = _mm_shuffle_epi32(tmp, _MM_SHUFFLE(1, 0, 3, 2));
-	tmp = _mm_min_epu32(tmp, min);
-	*b = tmp[0];
-}
-
-// Find optimal path given a coalition
-
-__attribute__((always_inline)) inline
-meter minpath(agent *c, agent n, agent dr, const meter *sp) {
-
-	meter r[R5];
-	register agent t, i = 1;
-	register meter min = UINT_MAX;
-
-	do {
-		switch (n) {
-			case 5:
-				#include "paths5.h"
-				minsse(r, R5);
-				break;
-			case 4:
-				#include "paths4.h"
-				minsse(r, R4);
-				break;
-			case 3:
-				#include "paths3.h"
-				minsse(r, R3);
-				break;
-			case 2:
-				#include "paths2.h"
-				break;
-			default:
-				#include "paths1.h"
-				break;
-		}
-
-		if (r[0] < min) min = r[0];
-
-		if (dr != 1) {
-			t = c[0];
-			c[0] = c[i];
-			c[i++] = t;
-		}
-	} while (--dr);
-
-	return min;
-}
+}*/
 
 // Merge coalitions of v1 and v2
 
@@ -446,7 +340,7 @@ penny bound(const stack *st) {
 				tr++;
 			}
 
-		agent as = cars[i] * CAR;
+		agent as = cars[i] * K;
 		b += cars[i] * CARCOST + ((tr > as) ? (tr - as) * TICKETCOST : 0);
 
 		if (cars[i]) {
@@ -531,7 +425,7 @@ void srcfss(stack *st, penny cur) {
 		CLEAR(tmp, st->g[v1 * N + v2]);
 
 		// Must not exceed the number of seats and the maximum number of drivers
-		if (X(st->s, v1) + X(st->s, v2) > CAR || st->dr[v1] + st->dr[v2] > MAXDRIVERS) continue;
+		if (X(st->s, v1) + X(st->s, v2) > K || st->dr[v1] + st->dr[v2] > MAXDRIVERS) continue;
 
 		CLEAR(st->c, st->g[v1 * N + v2]);
 		st[1] = st[0];
@@ -540,140 +434,6 @@ void srcfss(stack *st, penny cur) {
 		contract(st + 1, v1, v2);
 		st[1].l[v1] = minpath(st[1].cs + Y(st[1].s, v1), X(st[1].s, v1), st[1].dr[v1], st->sp);
 		srcfss(st + 1, cur + COST(v1, st[1].dr, st[1].l) - COST(v1, st->dr, st->l) - COST(v2, st->dr, st->l));
-	}
-}
-
-// A* sub-rountines
-
-__attribute__((always_inline)) inline
-void reheapdown(item *q, place root, place bottom) {
-
-	register place min, right, left = root * 2 + 1;
-	register item temp;
-
-	while (left <= bottom) {
-		right = root * 2 + 2;
-		if (left == bottom) min = left;
-		else min = q[left].f >= q[right].f ? right : left;
-		if (q[root].f > q[min].f) {
-			temp = q[root];
-			q[root] = q[min];
-			q[min] = temp;
-			left = (root = min) * 2 + 1;
-		}
-		else break;
-	}
-}
-
-__attribute__((always_inline)) inline
-void reheapup(item *q, place root, place bottom) {
-
-	register place parent;
-	register item temp;
-
-	while (bottom > root) {
-		parent = (bottom - 1) / 2;
-		if (q[parent].f > q[bottom].f) {
-			temp = q[parent];
-			q[parent] = q[bottom];
-			q[bottom] = temp;
-			bottom = parent;
-		}
-		else break;
-	}
-}
-
-__attribute__((always_inline)) inline
-void enqueue(item *q, place n, item x) {
-
-	q[n] = x;
-	reheapup(q, 0, n);
-}
-
-__attribute__((always_inline)) inline
-item dequeue(item *q, place n) {
-
-	register item temp = q[0];
-	if (n > 1) {
-		q[0] = q[n - 1];
-		reheapdown(q, 0, n - 2);
-	}
-	return temp;
-}
-
-// A* algorithm
-
-meter astar(place start, place dest, place nodes, const id *idx, const place *adj, const dist *d) {
-
-	uint8_t *cset = (uint8_t *)calloc(nodes, sizeof(uint8_t));
-	uint8_t *inoset = (uint8_t *)calloc(nodes, sizeof(uint8_t));
-	register place cur, deg, nbr, q = 1;
-	const place *nbrs;
-	register dist t;
-
-	item *oset = (item *)malloc(sizeof(item) * nodes);
-	dist *g = (dist *)malloc(sizeof(dist) * nodes);
-
-	register item i = { .p = start, .f = (g[start] = 0) + d[start * nodes + dest] };
-	oset[0] = i;
-	inoset[start] = 1;
-
-	while (q) {
-		cur = dequeue(oset, q).p;
-		if (cur == dest) {
-			free(inoset);
-			free(cset);
-			free(oset);
-			free(g);
-			return ROUND(meter, g[cur]);
-		}
-		inoset[cur] = 0;
-		q--;
-		cset[cur] = 1;
-		deg = *(nbrs = adj + idx[cur]);
-		nbrs++;
-		do {
-			if (!cset[nbr = *nbrs]) {
-				t = g[cur] + d[cur * nodes + nbr];
-				if (!inoset[nbr] || t < g[nbr]) {
-					i.p = nbr;
-					i.f = (g[nbr] = t) + d[nbr * nodes + dest];
-					if (!inoset[nbr]) {
-						enqueue(oset, q, i);
-						inoset[nbr] = 1;
-						q++;
-					}
-				}
-			}
-			nbrs++;
-		} while (--deg);
-	}
-
-	free(inoset);
-	free(cset);
-	free(oset);
-	free(g);
-
-	fputs("Invalid instance: points are not reachable\n", stderr);
-	exit(1);
-	return 0;
-}
-
-// Shuffle the content of an array
-
-void shuffle(void *array, size_t n, size_t size) {
-
-	uint8_t tmp[size];
-	uint8_t *arr = (uint8_t *)array;
-
-	if (n > 1) {
-		for (size_t i = 0; i < n - 1; ++i) {
-			size_t rnd = (size_t) rand();
-			size_t j = i + rnd / (RAND_MAX / (n - i) + 1);
-			memcpy(tmp, arr + j * size, size);
-			memcpy(arr + j * size, arr + i * size, size);
-			memcpy(arr + i * size, tmp, size);
-		}
 	}
 }
 
@@ -801,7 +561,7 @@ void scalefree(edge *g, agent *a) {
 	register uint_fast64_t d, i, j, h, k = 1, q, t = 0;
 	register int p;
 
-	for (i = 1; i <= K; i++) {
+	for (i = 1; i <= M; i++) {
 		for (j = 0; j < i; j++) {
 			createedge(g, a, i, j, k++);
 			deg[i]++;
@@ -809,9 +569,9 @@ void scalefree(edge *g, agent *a) {
 		}
 	}
 
-	for (i = K + 1; i < N; i++) {
+	for (i = M + 1; i < N; i++) {
 		t &= ~((1UL << i) - 1);
-		for (j = 0; j < K; j++) {
+		for (j = 0; j < M; j++) {
 			d = 0;
 			for (h = 0; h < i; h++)
 				if (!((t >> h) & 1)) d += deg[h];
@@ -836,71 +596,16 @@ void scalefree(edge *g, agent *a) {
 
 int main(int argc, char *argv[]) {
 
-	FILE *f;
-	place nodes, edges;
-	uint16_t pool;
-	unsigned seed = atoi(argv[1]);
-
-	f = fopen(XY, "rb");
-	fread(&nodes, sizeof(place), 1, f);
-
-	uint32_t *xy = (uint32_t *)malloc(sizeof(uint32_t) * 2 * nodes);
-	fread(xy, sizeof(uint32_t), 2 * nodes, f);
-	fclose(f);
-
-	// adjaciency list
-
-	f = fopen(ADJ, "rb");
-	fread(&edges, sizeof(place), 1, f);
-	place *adj = (place *)malloc(sizeof(place) * (2 * edges + nodes));
-	fread(adj, sizeof(place), 2 * edges + nodes, f);
-	fclose(f);
-
-	//printf("%u nodes, %u edges\n", nodes, edges);
-
-	// adjaciency indexes
-
-	f = fopen(IDX, "rb");
-	id *idx = (id *)malloc(sizeof(id) * nodes);
-	fread(idx, sizeof(id), nodes, f);
-	fclose(f);
-
-	// start and stop points
-
-	f = fopen(SS, "rb");
-	fread(&pool, sizeof(uint16_t), 1, f);
-	//printf("%u possible agents, choosing %u\n", pool, N);
-
-	place *stops = (place *)malloc(sizeof(place) * 2 * pool);
-	fread(stops, sizeof(place), 2 * pool, f);
-	fclose(f);
-
-	srand(seed);
-	shuffle(stops, pool, sizeof(place) * 2);
-	stops = (place *)realloc(stops, sizeof(place) * 2 * N);
-	dist *ds = (dist *)calloc(nodes * nodes, sizeof(dist));
-
-	for (place i = 0; i < nodes; i++)
-		for (place j = i + 1; j < nodes; j++) {
-			dist dx = (dist)X(xy, i) - X(xy, j);
-			dist dy = (dist)Y(xy, i) - Y(xy, j);
-			ds[i * nodes + j] = ds[j * nodes + i] = DIST(dx, dy);
-		}
+	// Allocate stack
 
 	stack st[N];
-	st->sp = (meter *)calloc(4 * N * N, sizeof(meter));
-	//printf("Using %u threads\n", omp_get_max_threads());
 
-	//#pragma omp parallel for schedule(dynamic) private(i, j)
-	for (agent i = 0; i < 2 * N; i++) {
-		st->sp[i * 2 * N + i] = UINT32_MAX;
-		for (agent j = i + 1; j < 2 * N; j++)
-			st->sp[i * 2 * N + j] = st->sp[j * 2 * N + i] = astar(stops[i], stops[j], nodes, idx, adj, ds);
-	}
+	// Create shortest paths matrix
 
-	free(ds);
-	free(adj);
-	memset(st->g, 0, sizeof(edge) * N * N);
+	const unsigned seed = atoi(argv[1]);
+	st->sp = createsp(seed);
+
+	// Generate random set of drivers
 
 	for (agent i = 0; i < D; i++)
 		st->dr[i] = 1;
@@ -908,6 +613,9 @@ int main(int argc, char *argv[]) {
 	memset(st->dr + D, 0, sizeof(agent) * (N - D));
 	shuffle(st->dr, N, sizeof(agent));
 	memcpy(drg, st->dr, N * sizeof(agent));
+
+	// Initialise n, s, and cs data structures
+
 	st->n[N] = N;
 
 	for (agent i = 0; i < N; i++) {
@@ -917,6 +625,8 @@ int main(int argc, char *argv[]) {
 		min += COST(i, st->dr, st->l);
 		st->n[st->n[i] = N + i + 1] = i;
 	}
+
+	// Initialise c and r bitmasks
 
 	ONES(st->c, E + 1, C);
 	CLEAR(st->c, 0);
@@ -930,6 +640,7 @@ int main(int argc, char *argv[]) {
 	memcpy(st->g, g, sizeof(edge) * N * N);
 	memcpy(st->a, a, sizeof(agent) * 2 * (E + 1));
 	#else
+	memset(st->g, 0, sizeof(edge) * N * N);
 	scalefree(st->g, st->a);
 	#endif
 
@@ -980,7 +691,7 @@ int main(int argc, char *argv[]) {
 
 	#ifdef PK
 	FILE *pk = fopen(PK, "w+");
-	fprintf(pk, "%u\n%u\n%u\n", N, CAR, seed);
+	fprintf(pk, "%u\n%u\n%u\n", N, K, seed);
 	printadj(st->a + 2, st->dr, pk);
 	printpk(&sol, pk);
 	fclose(pk);
@@ -1000,9 +711,6 @@ int main(int argc, char *argv[]) {
 	fclose(st->dot);
 	#endif
 	free(st->sp);
-	free(stops);
-	free(idx);
-	free(xy);
 
 	return 0;
 }

@@ -7,6 +7,7 @@ d=20					# Default d = 20
 m=2					# Default m = 2
 basename="twitter/net/twitter-2010"	# Twitter files must be in "twitter/net" subdir and have twitter-2010.* filenames
 wg="twitter/wg"				# Place WebGraph libraries in "twitter/wg" subdir
+tw=""
 
 usage() { echo -e "Usage: $0 -t <scalefree|twitter> -n <#agents> -s <seed> [-m <barabasi_m>] [-d <drivers_%>] [-p <output_file>]\n-t\tNetwork topology (either scalefree or twitter)\n-n\tNumber of agents\n-s\tSeed\n-d\tDrivers' percentage (optional, default d = 20)\n-m\tParameter m of the Barabasi-Albert model (optional, default m = 2)\n-p\tOutputs a solution file formatted for PK" 1>&2; exit 1; }
 
@@ -66,25 +67,45 @@ while getopts ":t:n:s:d:m:p:" o; do
 done
 shift $((OPTIND-1))
 
-if [ -z "${t}" ] || [ -z "${n}" ] || [ -z "${s}" ]; then
-	echo -e "${red}Missing one or more required options!${nc}\n"
-	usage
-fi
+tmp=`mktemp`
 
-echo -e "[\033[01;33m CC \033[0m] SR-CFSS"
+case "$t" in
+scalefree)
+	echo "#define M $m" > $tmp
+	;;
+twitter)
+	tw=`mktemp`
+	java -Xmx4000m -cp .:$wg/* ReduceGraph $basename $n $s | grep -v WARN > $tw
+	;;
+esac
 
-if [[ $t == "scalefree" ]] ; then
-	g++ -DN=$n -DK=$m -DDRIVERPERC=$d $pk -Wall -march=native -O0 -funroll-loops -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 *.c *.cpp -lm -o sr
-	rc=$?
-else
-	tmp=`mktemp`
-	java -Xmx4000m -cp .:$wg/* ReduceGraph $basename $n $s | grep -v WARN > $tmp
-	g++ -DTWITTER -DDRIVERPERC=$d $pk -Wall -march=native -O0 -funroll-loops -funsafe-loop-optimizations -falign-functions=16 -falign-loops=16 -include types.h -include $tmp *.c *.cpp -lm -o sr
-	rc=$?
-	rm $tmp
-fi
+echo "#define N $n" >> $tmp
+echo "#define DRIVERPERC $d" >> $tmp
 
-if [[ $rc == 0 ]]
+if [ ! -f instance.h ]
 then
-	time -p ./sr $s
+	mv $tmp "instance.h"
+else
+	md5a=`md5sum instance.h | cut -d\  -f 1`
+	md5b=`md5sum $tmp | cut -d\  -f 1`
+
+	if [ $md5a != $md5b ]
+	then
+		mv $tmp "instance.h"
+	else
+		rm $tmp
+	fi
+fi
+
+make -j
+if [[ $? == 0 ]]
+then
+	bin=$0
+	bin=${bin%???}
+	time -p $bin $s $tw
+fi
+
+if [[ $t == "twitter" ]]
+then
+	rm $tw
 fi
