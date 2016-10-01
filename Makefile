@@ -12,9 +12,11 @@ DBG=-g ${NOOPTIM}
 
 COBJSUBDIR=cobj
 DEPSUBDIR=dep
+WGSUBDIR=twitter/wg
 
 ECHOCC=>&2 echo "[\033[01;33m CC \033[0m]"
 ECHOLD=>&2 echo "[\033[01;36m LD \033[0m]"
+ECHOJC=>&2 echo "[\033[01;35m JC \033[0m]"
 
 OPT=${NOOPTIM} # Put desired optimisation level here
 
@@ -61,3 +63,7 @@ ${COBJSUBDIR}/sr.o: sr.cpp
 clean:
 	@echo "Removing subdirectories..."
 	@rm -rf ${COBJSUBDIR} ${DEPSUBDIR}
+
+reducegraph:
+	@${ECHOJC} ReduceGraph
+	@javac -cp .:${WGSUBDIR}/* ReduceGraph.java
