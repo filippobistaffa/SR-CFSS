@@ -19,7 +19,7 @@
 #include <fstream>
 #endif
 
-#ifndef TWITTER
+#ifdef M
 #define E (M * N - (M * (M + 1)) / 2)
 #endif
 

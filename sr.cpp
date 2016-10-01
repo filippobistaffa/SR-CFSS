@@ -439,7 +439,7 @@ void srcfss(stack *st, penny cur) {
 
 inline void createedge(edge *g, agent *a, agent v1, agent v2, edge e) {
 
-	//printf("%u -- %u\n", v1, v2);
+	printf("%u: %u -- %u\n", e, v1, v2);
 	g[v1 * N + v2] = g[v2 * N + v1] = e;
 	X(a, e) = v1;
 	Y(a, e) = v2;
@@ -553,7 +553,7 @@ edge reorderedges(const edge *g, const agent *map, idx_t n, edge m, edge *go, ag
 
 #endif
 
-#ifndef TWITTER
+#ifdef M
 
 void scalefree(edge *g, agent *a) {
 
@@ -635,13 +635,18 @@ int main(int argc, char *argv[]) {
 
 	// Create graph
 
+	#ifdef M
 	init(seed);
-	#ifdef TWITTER
-	memcpy(st->g, g, sizeof(edge) * N * N);
-	memcpy(st->a, a, sizeof(agent) * 2 * (E + 1));
-	#else
 	memset(st->g, 0, sizeof(edge) * N * N);
 	scalefree(st->g, st->a);
+	#else
+	FILE *f = fopen(argv[2], "r");
+	for (agent e = 1; e <= E; e++) {
+		agent v1, v2;
+		fscanf(f, "%hu %hu", &v1, &v2);
+		createedge(st->g, st->a, v1, v2, e);
+	}
+	fclose(f);
 	#endif
 
 	// Reorder (eventually)

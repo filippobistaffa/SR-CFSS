@@ -67,6 +67,11 @@ while getopts ":t:n:s:d:m:p:" o; do
 done
 shift $((OPTIND-1))
 
+if [ -z "${t}" ] || [ -z "${n}" ] || [ -z "${s}" ]; then
+	echo -e "${red}Missing one or more required options!${nc}\n"
+	usage
+fi
+
 tmp=`mktemp`
 
 case "$t" in
@@ -76,6 +81,11 @@ scalefree)
 twitter)
 	tw=`mktemp`
 	java -Xmx4000m -cp .:$wg/* ReduceGraph $basename $n $s | grep -v WARN > $tw
+	if [[ $? != 0 ]]
+	then
+		exit 1
+	fi
+	echo "#define E `cat $tw | wc -l`" > $tmp
 	;;
 esac
 
