@@ -15,8 +15,6 @@ public class ReduceGraph {
 		int[] g = new int[n * n];
 		java.util.ArrayList<Integer> al = new java.util.ArrayList<Integer>(n);
 		java.util.ArrayList<Integer> a = new java.util.ArrayList<Integer>(n * n);
-		a.add(0);
-		a.add(0);
 		al.add(startNode);
 
 		while (i < n) {
@@ -36,9 +34,7 @@ public class ReduceGraph {
 			i++;
 		}
 
-		String gs = java.util.Arrays.toString(g).replace('[', '{').replace(']', '}');
-		String as = a.toString().replace('[', '{').replace(']', '}');
-		System.out.println("#define N " + n + "\n#define E " + e + "\nstatic const edge g[" + n * n + "] = " + gs + ";");
-		System.out.println("static const agent a[" + (2 * (e + 1)) + "] = " + as + ";");
+		for (i = 0; i < e; i++)
+			System.out.format("%d %d\n", a.get(2 * i), a.get(2 * i + 1));
 	}
 }
