@@ -112,7 +112,7 @@ if [[ $? == 0 ]]
 then
 	bin=$0
 	bin=${bin%???}
-	time -p $bin $s $tw
+	$bin $s $tw
 fi
 
 if [[ $t == "twitter" ]]
