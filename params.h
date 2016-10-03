@@ -24,3 +24,6 @@
 
 // Update bound considering all the frontier (approximate version)
 #define COMPLETEFRONTIER
+
+// Output in CSV format
+#define CSV
