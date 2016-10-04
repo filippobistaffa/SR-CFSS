@@ -57,7 +57,6 @@ while getopts ":t:n:s:d:m:p:" o; do
 			echo -e "${red}Unable to create $p${nc}"
 			exit
 		fi
-		pk=-DPK=\"${p}\"
 		;;
 	\?)
 		echo -e "${red}-$OPTARG is not a valid option!${nc}\n"
@@ -91,6 +90,11 @@ esac
 
 echo "#define N $n" >> $tmp
 echo "#define DRIVERPERC $d" >> $tmp
+
+if [ ! -z $p ]
+then
+	echo "#define PK \"$p\"" >> $tmp
+fi
 
 if [ ! -f instance.h ]
 then
