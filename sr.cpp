@@ -557,36 +557,40 @@ edge reorderedges(const edge *g, const agent *map, idx_t n, edge m, edge *go, ag
 
 void scalefree(edge *g, agent *a) {
 
-	uint_fast8_t deg[N] = {0};
-	register uint_fast64_t d, i, j, h, k = 1, q, t = 0;
-	register int p;
+	edge ne = 1;
+	agent deg[N] = {0};
 
-	for (i = 1; i <= M; i++) {
-		for (j = 0; j < i; j++) {
-			createedge(g, a, i, j, k++);
+	for (agent i = 1; i <= M; i++) {
+		for (agent j = 0; j < i; j++) {
+			createedge(g, a, i, j, ne);
 			deg[i]++;
 			deg[j]++;
+			ne++;
 		}
 	}
 
-	for (i = M + 1; i < N; i++) {
-		t &= ~((1UL << i) - 1);
-		for (j = 0; j < M; j++) {
-			d = 0;
-			for (h = 0; h < i; h++)
-				if (!((t >> h) & 1)) d += deg[h];
+	chunk t[C] = { 0 }, t1[C] = { 0 };
+
+	for (agent i = M + 1; i < N; i++) {
+		ONES(t1, i, C);
+		MASKANDNOT(t, t1, t, C);
+		for (agent j = 0; j < M; j++) {
+			agent d = 0;
+			for (agent h = 0; h < i; h++)
+				if (!GET(t, h)) d += deg[h];
 			if (d > 0) {
-				p = nextInt(d);
-				q = 0;
+				int p = nextInt(d);
+				agent q = 0;
 				while (p >= 0) {
-					if (!((t >> q) & 1)) p = p - deg[q];
+					if (!GET(t, q)) p = p - deg[q];
 					q++;
 				}
 				q--;
-				t |= 1UL << q;
-				createedge(g, a, i, q, k++);
+				SET(t, q);
+				createedge(g, a, i, q, ne);
 				deg[i]++;
 				deg[q]++;
+				ne++;
 			}
 		}
 	}
