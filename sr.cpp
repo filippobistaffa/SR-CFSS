@@ -136,7 +136,8 @@ void printcs(const stack *st) {
 		agent i = *(p++);
 		printf("{ ");
 		for (agent j = 0; j < X(st->s, i); j++)
-			printf("%s%u%s%s ", i == st->cs[Y(st->s, i) + j] ? "<" : "", st->cs[Y(st->s, i) + j], i == st->cs[Y(st->s, i) + j] ? ">" : "", j < st->dr[i] ? "*" : "");
+			printf("%s%u%s%s ", i == st->cs[Y(st->s, i) + j] ? "<" : "", 
+			       st->cs[Y(st->s, i) + j], i == st->cs[Y(st->s, i) + j] ? ">" : "", j < st->dr[i] ? "*" : "");
 		printf("} (%um) = %.2f€\n", st->l[i], EURO(COST(i, st->dr, st->l)));
 	} while (--m);
 }
