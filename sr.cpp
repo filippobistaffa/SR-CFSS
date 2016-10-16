@@ -137,7 +137,7 @@ void printcs(const stack *st) {
                 printf("{ ");
                 for (agent j = 0; j < X(st->s, i); j++)
                 	printf("%s%u%s%s ", i == st->cs[Y(st->s, i) + j] ? "<" : "", st->cs[Y(st->s, i) + j], i == st->cs[Y(st->s, i) + j] ? ">" : "", j < st->dr[i] ? "*" : "");
-                printf("} (%um) = %.2f£\n", st->l[i], POUND(COST(i, st->dr, st->l)));
+                printf("} (%um) = %.2f€\n", st->l[i], EURO(COST(i, st->dr, st->l)));
         } while (--m);
 }
 
@@ -707,9 +707,9 @@ int main(int argc, char *argv[]) {
 	#else
 	printcs(&sol);
 	printf("Visited nodes = %zu\n", count);
-	printf("Solution = %.2f£\n", 0.01 * min);
+	printf("Solution = %.2f€\n", 0.01 * min);
 	#ifdef LIMIT
-	printf("Bound = %.2f£\n", 0.01 * bou);
+	printf("Bound = %.2f€\n", 0.01 * bou);
 	#endif
 	#endif
 

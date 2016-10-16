@@ -1,14 +1,7 @@
 #ifndef SRCFSS_H_
 #define SRCFSS_H_
 
-#include <omp.h>
-#include <math.h>
-#include <stdio.h>
-#include <limits.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/time.h>
-#include <immintrin.h>
 
 #include "instance.h"
 #include "macros.h"

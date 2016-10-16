@@ -1,18 +1,22 @@
 // Maximum coalition size
 #define K 5
 
-#define CARCOST 100
-#define TICKETCOST 300
-#define PENNYPERLITRE 130
-#define METERSPERLITRE 15000
+// Maximum number of drivers per car
 #define MAXDRIVERS 1
-#define EPSILON 0.05
+
+// Minimum gain
 #define MINGAIN 1
 
+// Enable branch and bound
 #define BOUND
+
+// Enable edge reordering
 //#define REORDER
+
+// Enable parallelism
 //#define PARALLEL
 
+// Write search tree to file in DOT format
 //#define TREEDOT "tree.dot"
 
 // Enable approximate version of SR-CFSS
@@ -26,4 +30,4 @@
 #define COMPLETEFRONTIER
 
 // Output in CSV format
-#define CSV
+//#define CSV
