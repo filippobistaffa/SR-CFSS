@@ -19,7 +19,7 @@
 #include "types.h"
 
 #define COST(I, DR, L) ((DR)[(I)] ? (PATHCOST((L)[I]) + CARCOST) : TICKETCOST)
-#define PATHCOST(p) ROUND(penny, (float)(p) / METERSPERLITRE * CENTSPERLITRE)
+#define PATHCOST(p) ROUND(value, (float)(p) / METERSPERLITRE * CENTSPERLITRE)
 #define EURO(i) ((float)(i) / 100)
 
 #define R5 2520

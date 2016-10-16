@@ -1,8 +1,8 @@
 #include "sr.h"
 
-penny min;
+value min;
 #ifdef LIMIT
-penny bou;
+value bou;
 #endif
 bool stop;
 size_t count;
@@ -302,12 +302,12 @@ void connect(stack *st, agent *cars) {
 }
 
 __attribute__((always_inline)) inline
-penny bound(const stack *st) {
+value bound(const stack *st) {
 
 	stack tst = *st;
 	agent i, m = st->n[N];
 	const agent *p = st->n + N + 1;
-	penny b = 0;
+	value b = 0;
 
 	agent cars[N] = {0};
 	agentpath mp[N];
@@ -329,7 +329,7 @@ penny bound(const stack *st) {
 	do if (X(tst.s, i = *(p++)) == 1) b += COST(i, st->dr, st->l);
 	else {
 		agent cy, ck, tr = 0, ccx = X(tst.s, i);
-		penny pc, b1 = 0, b2 = 0;
+		value pc, b1 = 0, b2 = 0;
 
 		for (agent j = 0; j < ccx; j++)
 			for (agent k = 0; k < X(st->s, cy = tst.cs[Y(tst.s, i) + j]); k++) {
@@ -377,7 +377,7 @@ penny bound(const stack *st) {
 	return b;
 }
 
-void srcfss(stack *st, penny cur) {
+void srcfss(stack *st, value cur) {
 
 	#ifdef TREEDOT
 	st->id = count;
@@ -400,7 +400,7 @@ void srcfss(stack *st, penny cur) {
 	#endif
 
 	#ifdef BOUND
-	const penny b = bound(st);
+	const value b = bound(st);
 	#ifdef LIMIT
 	if (stop) { if (b < bou) bou = b; return; }
 	else
@@ -686,7 +686,7 @@ int main(int argc, char *argv[]) {
 
 	sol = *st;
 	#ifdef LIMIT
-	penny bou = bound(st);
+	value bou = bound(st);
 	#endif
 	gettimeofday(&t1, NULL);
 	srcfss(st, min);
