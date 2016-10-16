@@ -65,7 +65,7 @@ void memcpyaligned(void* dest, const void* src, const size_t size) {
 __attribute__((always_inline)) inline
 void merge(stack *st, agent v1, agent v2) {
 
-	register agent a, b, da, db, i, min = v1, max = v2, *p = st->n + N + 1;
+	agent a, b, da, db, i, min = v1, max = v2, *p = st->n + N + 1;
 
 	if (Y(st->s, max) < Y(st->s, min)) {
 		b = max;
@@ -130,15 +130,15 @@ void contract(stack *st, agent v1, agent v2) {
 void printcs(const stack *st) {
 
 	const agent *p = st->n + N + 1;
-        agent m = st->n[N];
+	agent m = st->n[N];
 
 	do {
 		agent i = *(p++);
-                printf("{ ");
-                for (agent j = 0; j < X(st->s, i); j++)
-                	printf("%s%u%s%s ", i == st->cs[Y(st->s, i) + j] ? "<" : "", st->cs[Y(st->s, i) + j], i == st->cs[Y(st->s, i) + j] ? ">" : "", j < st->dr[i] ? "*" : "");
-                printf("} (%um) = %.2f€\n", st->l[i], EURO(COST(i, st->dr, st->l)));
-        } while (--m);
+		printf("{ ");
+		for (agent j = 0; j < X(st->s, i); j++)
+			printf("%s%u%s%s ", i == st->cs[Y(st->s, i) + j] ? "<" : "", st->cs[Y(st->s, i) + j], i == st->cs[Y(st->s, i) + j] ? ">" : "", j < st->dr[i] ? "*" : "");
+		printf("} (%um) = %.2f€\n", st->l[i], EURO(COST(i, st->dr, st->l)));
+	} while (--m);
 }
 
 // Print coalition structure in PK format
@@ -164,24 +164,24 @@ void printadj(const agent *a, const agent *dr, FILE *pk) {
 	for (; e < N; e++) {
 		QSORT(agent, l + e * N + 1, l[e * N], LTDR);
 		fprintf(pk, "%u", l[e * N]);
-                for (agent j = 1; j <= l[e * N]; j++)
+		for (agent j = 1; j <= l[e * N]; j++)
 			fprintf(pk, " %u", l[e * N + j]);
-                fprintf(pk, "\n");
+		fprintf(pk, "\n");
 	}
 }
 
 void printpk(const stack *st, FILE *pk) {
 
 	const agent *p = st->n + N + 1;
-        agent m = st->n[N];
+	agent m = st->n[N];
 
 	do {
 		agent i = *(p++);
 		fprintf(pk, "%s%u", st->dr[i] ? "*" : "", st->cs[Y(st->s, i)]);
-                for (agent j = 1; j < X(st->s, i); j++)
+		for (agent j = 1; j < X(st->s, i); j++)
 			fprintf(pk, " %u", st->cs[Y(st->s, i) + j]);
-                fprintf(pk, "\n");
-        } while (--m);
+		fprintf(pk, "\n");
+	} while (--m);
 }
 
 #endif
@@ -190,8 +190,8 @@ void printpk(const stack *st, FILE *pk) {
 
 void printcsordered(const stack *st) {
 
-        register agent i, j, k = 0, m = st->n[N];
-	register const agent *p = st->n + N + 1;
+	agent i, j, k = 0, m = st->n[N];
+	const agent *p = st->n + N + 1;
 	agent cst[N];
 	memcpy(cst, st->cs, sizeof(agent) * N);
 	typedef struct { agent a; uint32_t x; } coal;
@@ -226,8 +226,8 @@ static char* names[] = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
 
 void graph2png(const agent *a, const agent *n, const contr c, const contr r, const contr d, const char* filename) {
 
-	register const agent *p = n + N + 1;
-	register agent m = n[N];
+	const agent *p = n + N + 1;
+	agent m = n[N];
 	GVC_t *gvc = gvContext();
 	Agraph_t* g = agopen("test", Agstrictundirected, 0);
 	agsafeset(g, "overlap", "false", "");
@@ -492,7 +492,7 @@ void driversbfs(const stack *st, edge *gr, agent *ar) {
 void splitgraph(const edge *g, const agent *map, const idx_t *part, edge *g1, agent n1, edge *m1, agent *map1,
 		edge *g2, agent n2, edge *m2, agent *map2, edge *go, agent *ao, edge *e) {
 
-	register agent p, n = n1 + n2, a = 0, b = 0;
+	agent p, n = n1 + n2, a = 0, b = 0;
 	agent inv[n];
 
 	for (agent i = 0; i < n; i++) inv[i] = part[i] ? a++ : b++;
@@ -532,7 +532,7 @@ edge reorderedges(const edge *g, const agent *map, idx_t n, edge m, edge *go, ag
 	idx_t xadj[n + 1], adjncy[2 * m];
 	graph2csr(g, n, m, xadj, adjncy);
 	ROUTINE(&n, &ncon, xadj, adjncy, NULL, NULL, NULL, &nparts, tpwgts, ubvec, options, &cutsize, part);
-	register agent i, j, n2, n1 = 0;
+	agent i, j, n2, n1 = 0;
 	for (i = 0; i < n; i++) if (part[i]) n1++;
 	n2 = n - n1;
 
