@@ -713,6 +713,7 @@ int main(int argc, char *argv[]) {
 	#else
 	printcs(&sol);
 	printf("Visited nodes = %zu\n", count);
+	printf("Elapsed time = %f\n", (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec);
 	printf("Solution = %.2f€\n", 0.01 * min);
 	#ifdef LIMIT
 	printf("Bound = %.2f€\n", 0.01 * bou);
