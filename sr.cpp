@@ -648,7 +648,7 @@ int main(int argc, char *argv[]) {
 	FILE *f = fopen(argv[2], "r");
 	for (agent e = 1; e <= E; e++) {
 		agent v1, v2;
-		fscanf(f, "%hu %hu", &v1, &v2);
+		fscanf(f, "%u %u", &v1, &v2);
 		createedge(st->g, st->a, v1, v2, e);
 	}
 	fclose(f);
