@@ -171,6 +171,15 @@ void printadj(const agent *a, const agent *dr, FILE *pk) {
 	}
 }
 
+void printg(const edge *g, FILE *pk) {
+
+	for (agent i = 0; i < N; ++i) {
+		for (agent j = 0; j < N - 1; ++j)
+			fprintf(pk, "%u ", g[i * N + j]);
+		fprintf(pk, "%u\n", g[i * N + N - 1]);
+	}
+}
+
 void printpk(const stack *st, FILE *pk) {
 
 	const agent *p = st->n + N + 1;
@@ -702,7 +711,7 @@ int main(int argc, char *argv[]) {
 	#ifdef PK
 	FILE *pk = fopen(PK, "w+");
 	fprintf(pk, "%u\n%u\n%u\n", N, K, seed);
-	printadj(st->a + 2, st->dr, pk);
+	printg(st->g, pk);
 	printpk(&sol, pk);
 	fclose(pk);
 	#endif
