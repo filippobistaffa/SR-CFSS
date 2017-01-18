@@ -717,7 +717,7 @@ int main(int argc, char *argv[]) {
 	#endif
 
 	#ifdef CSV
-	printf("%u,%u,%s,%.2f,%f,%zu\n", N, E, argv[1], 0.01 * min, 
+	printf("%u,%u,%s,%.2f,%f,%zu\n", N, E, argv[1], 0.01 * min,
 	       (double)(t2.tv_usec - t1.tv_usec) / 1e6 + t2.tv_sec - t1.tv_sec, count);
 	#else
 	printcs(&sol);
