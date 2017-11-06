@@ -186,3 +186,47 @@ meter *createsp(unsigned seed) {
 
 	return sp;
 }
+
+meter *computem(const meter *sp, const agent *dr) {
+
+	meter *ret = (meter *)malloc(sizeof(meter) * N);
+
+	for (agent i = 0; i < N; ++i) {
+
+		// start
+		meter min_a = UINT_MAX;
+
+		if (dr[i]) {
+			for (agent j = 0; j < N; ++j) {
+				if (i != j) {
+					const meter cur_a = sp[(2 * i) * 2 * N + (2 * j)];
+					if (cur_a < min_a) {
+						min_a = cur_a;
+					}
+				}
+			}
+		} else {
+			//TODO:
+		}
+
+		// destination
+		meter min_b = UINT_MAX;
+
+		if (dr[i]) {
+			for (agent j = 0; j < N; ++j) {
+				if (i != j) {
+					const meter cur_b = sp[(2 * i + 1) * 2 * N + (2 * j + 1)];
+					if (cur_b < min_b) {
+						min_b = cur_b;
+					}
+				}
+			}
+		} else {
+			//TODO:
+		}
+
+		ret[i] = min_a + min_b;
+	}
+
+	return ret; 
+}

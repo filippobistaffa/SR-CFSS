@@ -386,6 +386,26 @@ value bound(const stack *st) {
 	return b;
 }
 
+__attribute__((always_inline)) inline
+value boundpaper(const stack *st) {
+
+	const agent *p = st->n + N + 1;
+	agent m = st->n[N];
+	value b = 0;
+
+	do {
+		agent i = *(p++);
+		if (st->dr[i]) {
+			// iterate over cars' passengers
+			for (agent j = 0; j < X(st->s, i); j++) {
+				b += st->m[st->cs[Y(st->s, i) + j]];
+			}
+		}
+	} while (--m);
+
+	return 0.5 * PATHCOST(b);
+}
+
 void srcfss(stack *st, value cur) {
 
 	#ifdef TREEDOT
@@ -409,7 +429,7 @@ void srcfss(stack *st, value cur) {
 	#endif
 
 	#ifdef BOUND
-	const value b = bound(st);
+	const value b = boundpaper(st);
 	#ifdef LIMIT
 	if (stop) { if (b < bou) bou = b; return; }
 	else
@@ -627,6 +647,10 @@ int main(int argc, char *argv[]) {
 	memset(st->dr + D, 0, sizeof(agent) * (N - D));
 	shuffle(st->dr, N, sizeof(agent));
 	memcpy(drg, st->dr, N * sizeof(agent));
+	
+	// compute m function
+
+	st->m = computem(st->sp, st->dr);
 
 	// Initialise n, s, and cs data structures
 
@@ -695,7 +719,7 @@ int main(int argc, char *argv[]) {
 
 	sol = *st;
 	#ifdef LIMIT
-	value bou = bound(st);
+	value bou = boundpaper(st);
 	#endif
 	gettimeofday(&t1, NULL);
 	srcfss(st, min);

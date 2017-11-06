@@ -6,6 +6,7 @@
 #include <omp.h>
 #include <math.h>
 #include <stdlib.h>
+#include <climits>
 
 #include "instance.h"
 #include "random.h"
@@ -22,5 +23,7 @@
 typedef struct { place p; dist f; } item;
 
 meter *createsp(unsigned seed);
+
+meter *computem(const meter *sp, const agent *dr);
 
 #endif /* SP_H_ */
