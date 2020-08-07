@@ -429,7 +429,7 @@ void srcfss(stack *st, value cur) {
 	#endif
 
 	#ifdef BOUND
-	const value b = boundpaper(st);
+	const value b = bound(st);
 	#ifdef LIMIT
 	if (stop) { if (b < bou) bou = b; return; }
 	else
@@ -719,7 +719,7 @@ int main(int argc, char *argv[]) {
 
 	sol = *st;
 	#ifdef LIMIT
-	value bou = boundpaper(st);
+	value bou = bound(st);
 	#endif
 	gettimeofday(&t1, NULL);
 	srcfss(st, min);
